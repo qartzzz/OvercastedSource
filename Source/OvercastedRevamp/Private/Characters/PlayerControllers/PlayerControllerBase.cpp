@@ -8,7 +8,7 @@
 
 APlayerControllerBase::APlayerControllerBase()
 {
-	RespawnMenu = ConstructorHelpers::FClassFinder<UUserWidget>(TEXT("/Game/Character/RespawnMenu/WBP_RespawnMenu")).Class;
+	RespawnMenu = ConstructorHelpers::FClassFinder<UUserWidget>(TEXT("/Game/Character/UI_RespawnMenu/WBP_RespawnMenu")).Class;
 }
 
 void APlayerControllerBase::Tick(float DeltaSeconds)

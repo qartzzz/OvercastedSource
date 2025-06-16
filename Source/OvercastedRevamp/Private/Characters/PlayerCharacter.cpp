@@ -13,6 +13,9 @@
 #include "InputMappingContext.h"
 #include "Engine/AssetManager.h"
 #include "Engine/StreamableManager.h"
+#include "GameFramework/PlayerState.h"
+#include "Interfaces/IPlayerWorldInteraction.h"
+#include "Interfaces/IWeaponInteraction.h"
 
 
 APlayerCharacter::APlayerCharacter()
@@ -36,7 +39,12 @@ APlayerCharacter::APlayerCharacter()
 	FirstPersonWeapon->SetOnlyOwnerSee(true);
 
 	DT_Items = ConstructorHelpers::FObjectFinder<UDataTable>(TEXT("/Game/Items/DT_Items.DT_Items")).Object;
+	
 	Inventory = CreateDefaultSubobject<UInventoryComponent>(TEXT("Inventory"));
+
+	Equipment = CreateDefaultSubobject<UInventoryComponent>(TEXT("Equipment"));
+
+	Expenses = CreateDefaultSubobject<UExpensesComponent>(TEXT("Expenses"));
 }
 
 void APlayerCharacter::BeginPlay()
@@ -65,7 +73,15 @@ void APlayerCharacter::Tick(float DeltaSeconds)
 void APlayerCharacter::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	DOREPLIFETIME(APlayerCharacter,CharacterState);
+	
+	FDoRepLifetimeParams ParamsBasic;
+	ParamsBasic.bIsPushBased = true;
+	DOREPLIFETIME_WITH_PARAMS_FAST(APlayerCharacter,CharacterState,ParamsBasic);
+
+	FDoRepLifetimeParams ParamsOwnerOnly;
+	ParamsOwnerOnly.bIsPushBased = true;
+	ParamsOwnerOnly.Condition = COND_OwnerOnly;
+	DOREPLIFETIME_WITH_PARAMS_FAST(APlayerCharacter,CurrentSlot,ParamsOwnerOnly);
 }
 
 void APlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -80,7 +96,19 @@ void APlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 	Input->BindAction(InputActionMove, ETriggerEvent::Triggered, this, &APlayerCharacter::Move);
 	Input->BindAction(InputActionLook, ETriggerEvent::Triggered, this, &APlayerCharacter::Look);
 	Input->BindAction(InputActionJump, ETriggerEvent::Triggered, this, &APlayerCharacter::ActionJump);
+	
 	Input->BindAction(InputActionSlots, ETriggerEvent::Started, this, &APlayerCharacter::ChangeSlots);
+	
+	Input->BindAction(InputActionInteract, ETriggerEvent::Started, this, &APlayerCharacter::Interact);
+	
+	Input->BindAction(InputActionAttack, ETriggerEvent::Started, this, &APlayerCharacter::Attack);
+	Input->BindAction(InputActionSecondAttack, ETriggerEvent::Started, this, &APlayerCharacter::SecondAttack);
+	Input->BindAction(InputActionAttack, ETriggerEvent::Completed, this, &APlayerCharacter::AttackReleased);
+	Input->BindAction(InputActionSecondAttack, ETriggerEvent::Completed, this, &APlayerCharacter::SecondAttackReleased);
+	Input->BindAction(InputActionReload, ETriggerEvent::Started, this, &APlayerCharacter::Reload);
+	
+	
+	
 }
 
 void APlayerCharacter::Move(const FInputActionValue& Value)
@@ -110,41 +138,6 @@ void APlayerCharacter::ActionJump(const FInputActionValue& Value)
 	}
 }
 
-void APlayerCharacter::JumpDelay()
-{
-	CanJump = true;
-}
-
-float APlayerCharacter::TakeDamage(float DamageAmount, const FDamageEvent& DamageEvent, AController* EventInstigator,AActor* DamageCauser)
-{
-	if (DamageEvent.DamageTypeClass == UDamageTypeBase::StaticClass())
-	{
-		UDamageTypeBase* DamageType = Cast<UDamageTypeBase>(DamageEvent.DamageTypeClass.GetDefaultObject());
-		SetHealth(Health -= DamageAmount * DamageType->GetDamageMultiplier(PawnType));
-	}
-	else
-	{
-		SetHealth(Health - DamageAmount);
-	}
-	
-	if (Health <= 0)
-	{
-		if (CharacterState == ECharacterState::Basic)
-		{
-			CharacterState = ECharacterState::Wounded;
-			OnWounded();
-		}
-		else
-		{
-			CharacterState = ECharacterState::Killed;
-			OnKilled();
-		}
-	}
-	
-	ClientHealthChanged(IsValid(DamageCauser) ? DamageCauser->GetActorLocation() : FVector::ZeroVector);
-	return DamageAmount;
-}
-
 void APlayerCharacter::ChangeSlots()
 {
 	const APlayerController* PlayerController = Cast<APlayerController>(GetController());
@@ -169,8 +162,11 @@ void APlayerCharacter::ChangeSlot(const uint8 Slot)
 	if (Inventory->Content.Items.IsValidIndex(Slot - 1))
 	{
 		const FSerializedInventorySlot Item = Inventory->Content.Items[Slot - 1];
-		CurrentSlot = Slot;
+		CurrentSlot = Slot - 1;
 		CurrentSlotUniqueID = Item.UniqueSlotID;
+		
+		MARK_PROPERTY_DIRTY_FROM_NAME(APlayerCharacter,CurrentSlot,this);
+		
 		if (DT_Items->GetRowNames().Contains(Item.Slot.ItemID))
 		{
 			SetCurrentAnimation(DT_Items->FindRow<FItemData>(Item.Slot.ItemID,"")->ItemAnimation);
@@ -205,7 +201,123 @@ void APlayerCharacter::ChangeWeapon(const FSerializedInventorySlot& Item)
 	}
 }
 
+void APlayerCharacter::Interact()
+{
+	SR_Interact();
+	GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, "Interacting");
+}
 
+void APlayerCharacter::SR_Interact_Implementation()
+{
+	TArray<FHitResult> Hits;
+	const FVector Start = Camera->GetComponentLocation();
+	const FVector End = Start + GetBaseAimRotation().Vector() * 400;
+	FCollisionShape CollisionShape;
+	CollisionShape.SetSphere(10);
+	
+	GetWorld()->SweepMultiByChannel(Hits,Start,End,Camera->GetForwardVector().ToOrientationQuat(),ECC_Visibility,CollisionShape);
+	GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, "Interacting");
+	for (const FHitResult& Hit: Hits)
+	{
+		if (Hit.bBlockingHit && Hit.GetActor() != this)
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, Hit.GetActor()->GetName());
+			if (Hit.GetActor()->GetClass()->ImplementsInterface(UIPlayerWorldInteraction::StaticClass()))
+			{
+				GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, "SendingMessage");
+				IIPlayerWorldInteraction::Execute_Interact(Hit.GetActor(),this->GetPlayerState()->GetPlayerController(),Hit);
+				return;	
+			}
+		}
+	}
+	
+}
+
+void APlayerCharacter::Attack()
+{
+	SR_Attack(false);
+}
+
+void APlayerCharacter::AttackReleased()
+{
+	SR_Attack(true);
+}
+
+void APlayerCharacter::SR_Attack_Implementation(const bool Released)
+{
+	if (IsValid(CurrentWeapon) && CurrentWeapon->GetClass()->ImplementsInterface(UIWeaponInteraction::StaticClass()))
+	{
+		IIWeaponInteraction::Execute_PerformAction(CurrentWeapon,Released ? EWeaponAction::AttackRelease : EWeaponAction::Attack);
+	}
+}
+
+void APlayerCharacter::SecondAttack()
+{
+	SR_SecondAttack(false);
+}
+
+void APlayerCharacter::SecondAttackReleased()
+{
+	SR_SecondAttack(true);
+}
+
+void APlayerCharacter::SR_SecondAttack_Implementation(const bool Released)
+{
+	if (IsValid(CurrentWeapon) && CurrentWeapon->GetClass()->ImplementsInterface(UIWeaponInteraction::StaticClass()))
+	{
+		IIWeaponInteraction::Execute_PerformAction(CurrentWeapon,Released ? EWeaponAction::Attack2Release : EWeaponAction::Attack2);
+	}
+}
+
+void APlayerCharacter::Reload()
+{
+	SR_Reload();
+}
+
+void APlayerCharacter::SR_Reload_Implementation()
+{
+	if (IsValid(CurrentWeapon) && CurrentWeapon->GetClass()->ImplementsInterface(UIWeaponInteraction::StaticClass()))
+	{
+		IIWeaponInteraction::Execute_PerformAction(CurrentWeapon,EWeaponAction::Reload);
+	}
+}
+
+
+void APlayerCharacter::JumpDelay()
+{
+	CanJump = true;
+}
+
+float APlayerCharacter::TakeDamage(float DamageAmount, const FDamageEvent& DamageEvent, AController* EventInstigator,AActor* DamageCauser)
+{
+	if (DamageEvent.DamageTypeClass == UDamageTypeBase::StaticClass())
+	{
+		UDamageTypeBase* DamageType = Cast<UDamageTypeBase>(DamageEvent.DamageTypeClass.GetDefaultObject());
+		SetHealth(Health -= DamageAmount * DamageType->GetDamageMultiplier(PawnType));
+	}
+	else
+	{
+		SetHealth(Health - DamageAmount);
+	}
+	
+	if (Health <= 0)
+	{
+		MARK_PROPERTY_DIRTY_FROM_NAME(APlayerCharacter,CharacterState,this);
+		if (CharacterState == ECharacterState::Basic)
+		{
+			CharacterState = ECharacterState::Wounded;
+			OnWounded();
+		}
+		else
+		{
+			CharacterState = ECharacterState::Killed;
+			OnKilled();
+		}
+	}
+	
+	ClientHealthChanged(IsValid(DamageCauser) ? DamageCauser->GetActorLocation() : FVector::ZeroVector);
+	return DamageAmount;
+}
 
 void APlayerCharacter::OnComponentLoaded()
 {

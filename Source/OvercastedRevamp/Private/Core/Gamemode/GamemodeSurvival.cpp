@@ -6,7 +6,7 @@
 
 AGamemodeSurvival::AGamemodeSurvival()
 {
-	HUDClass = ConstructorHelpers::FClassFinder<AHUD>(TEXT("/Game/Character/HUD/BP_HUD")).Class;
+	HUDClass = ConstructorHelpers::FClassFinder<AHUD>(TEXT("/Game/Character/UI_HUD/BP_HUD")).Class;
 	DefaultPawnClass = ConstructorHelpers::FClassFinder<APawn>(TEXT("/Game/Character/BP_PlayerCharacter")).Class;
     PlayerControllerClass = ConstructorHelpers::FClassFinder<APlayerController>(TEXT("/Game/Character/PlayerController/BP_PlayerController")).Class;
 	PrimaryActorTick.bCanEverTick = false;

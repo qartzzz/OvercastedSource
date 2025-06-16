@@ -5,14 +5,14 @@
 #include "CoreMinimal.h"
 #include "Characters/PlayerCharacter.h"
 #include "Components/ActorComponent.h"
-#include "Interfaces/IWeapon.h"
+#include "Interfaces/IWeaponInteraction.h"
 #include "HotBarInteraction.generated.h"
 
 
 class UInventoryComponent;
 
 UCLASS(ClassGroup=(Custom), meta=(BlueprintSpawnableComponent))
-class OVERCASTEDREVAMP_API UHotBarInteraction : public UActorComponent , public IIWeapon
+class OVERCASTEDREVAMP_API UHotBarInteraction : public UActorComponent , public IIWeaponInteraction
 {
 	GENERATED_BODY()
 

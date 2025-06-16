@@ -8,9 +8,9 @@ public class OvercastedRevamp : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 	
-		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput","UMG","NetCore","OnlineSubsystemSteam","NavigationSystem"});
+		PublicDependencyModuleNames.AddRange(new string[] { "Core", "Core" , "CoreUObject", "Engine", "InputCore", "EnhancedInput", "UMG", "NetCore", "OnlineSubsystemSteam", "NavigationSystem", "PhysicsCore"});
 
-		PrivateDependencyModuleNames.AddRange(new string[] {});
+		PrivateDependencyModuleNames.AddRange(new string[]{});
 
 		SetupIrisSupport(Target);
 		// Uncomment if you are using Slate UI

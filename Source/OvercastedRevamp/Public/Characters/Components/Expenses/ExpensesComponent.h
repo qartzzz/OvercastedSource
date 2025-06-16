@@ -61,10 +61,14 @@ struct FExpensesArray : public FFastArraySerializer
 {
 	GENERATED_BODY()
 
-	bool NetDeltaSerialize(FNetDeltaSerializeInfo& DeltaParms);
-	
 	UPROPERTY(BlueprintReadOnly, EditDefaultsOnly)
 	TArray<FExpense> Expenses;
+	
+	bool NetDeltaSerialize(FNetDeltaSerializeInfo& DeltaParms)
+	{
+		return FastArrayDeltaSerialize<FExpense,FExpensesArray>(Expenses, DeltaParms,*this);
+	}
+	
 };
 
 template<>

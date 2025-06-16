@@ -42,6 +42,20 @@ void UInventoryComponent::InventoryUpdated()
 	LocalPreviousItems = Content.Items;
 }
 
+void UInventoryComponent::EditSlotTag(const int Index,const EItemTags Tag,const FName NewValue)
+{
+	Content.MarkItemDirty(Content.Items[Index]);
+	GetOwner()->ForceNetUpdate();
+	
+	for (FItemTags& ItemTag : Content.Items[Index].Slot.ItemTags)
+	{
+		if (ItemTag.Key == Tag)
+		{
+			ItemTag.Value = NewValue;
+		}
+	}
+}
+
 int UInventoryComponent::GetItemAmount(const FName& ItemID)
 {
 	int Amount = 0;
@@ -109,17 +123,19 @@ void UInventoryComponent::BeginPlay()
 		
 		Content.MarkArrayDirty();
 		
-		OC_InventoryUpdated();
+		
 	}
 	else
 	{
 		LocalPreviousItems.SetNum(InventorySize);
 	}
+
+	InventoryUpdated();
 }
 
 void UInventoryComponent::OnRep_Content()
 {
-	OC_InventoryUpdated();
+	InventoryUpdated();
 }
 
 
@@ -173,7 +189,7 @@ void UInventoryComponent::GenerateSlotsUniqueIDs()
 	}
 }
 
-bool UInventoryComponent::AddItems(FInventorySlot NewItem)
+bool UInventoryComponent::AddItem(FInventorySlot NewItem)
 {
 	if (DT_Items->GetRowNames().Contains(NewItem.ItemID))
 	{
@@ -185,14 +201,10 @@ bool UInventoryComponent::AddItems(FInventorySlot NewItem)
 			const int EmptyIndex = FindEmptyIndex();
 			if (StackIndex != -1)
 			{
-				//GEngine->AddOnScreenDebugMessage(-1,5,FColor::White,FString::FromInt(Content[StackIndex].Amount));
-				//GEngine->AddOnScreenDebugMessage(-1,5,FColor::Yellow,FString::FromInt(StackIndex));
 				NewItem.Amount = AddToStack(NewItem,StackIndex);  
 			}
 			else if(EmptyIndex != -1)
 			{
-				//GEngine->AddOnScreenDebugMessage(-1,5,FColor::Blue,FString::FromInt(Content[EmptyIndex].Amount));
-				//GEngine->AddOnScreenDebugMessage(-1,5,FColor::Emerald,FString::FromInt(EmptyIndex));
 				NewItem.Amount = AddToEmptySlot(NewItem,EmptyIndex);
 			}
 			else
@@ -201,14 +213,21 @@ bool UInventoryComponent::AddItems(FInventorySlot NewItem)
 			}
 		}
 		GetOwner()->ForceNetUpdate();
+		InventoryUpdated();
 		return NewItem.Amount == 0;
 	}
 	return false;
 }
 
-
-/** HELPER FUNCTIONS */
-
+bool UInventoryComponent::AddItems(TArray<FInventorySlot> NewItems)
+{
+	bool Failed = false;
+	for(FInventorySlot NewItem : NewItems)
+	{
+		Failed = !AddItem(NewItem);
+	}
+	return Failed;
+}
 
 int UInventoryComponent::GetMaxStackSize(const FName ItemID) const
 {
@@ -223,7 +242,6 @@ bool UInventoryComponent::IsInnerAcceptable(const FName Outer, const FName ItemI
 {
 	if (DT_Items->GetRowNames().Contains(Outer) && DT_Items->GetRowNames().Contains(ItemID))
 	{
-		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, ItemID.ToString());
 		return DT_Items->FindRow<FItemData>(Outer,"")->AcceptableInnerItems.Contains(ItemID);
 	}
 	return false;
@@ -255,10 +273,6 @@ int UInventoryComponent::FindStackableIndex(const FInventorySlot& ItemToStack) c
 	return -1;
 }
 
-
-/** NETWORKING */
-
-
 void UInventoryComponent::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
@@ -270,39 +284,28 @@ void UInventoryComponent::GetLifetimeReplicatedProps(TArray<class FLifetimePrope
 	
 }
 
-void UInventoryComponent::OC_InventoryUpdated_Implementation()
-{
-	InventoryUpdated();
-}
-
 void UInventoryComponent::ServerMoveItem_Implementation(UInventoryComponent* DestinationInventory,const int DestinationIndex,const int SourceIndex ,const int AddAmount,const int SourceSlotContentIndex,const int DestinationSlotContentIndex)
 {
 	if (DestinationInventory->Features.Contains(EInventoryFeatures::ForEquipment))
 	{
 		if (DT_Equipment->GetRowNames().Contains(Content.Items[SourceIndex].Slot.ItemID))
 		{
-			GEngine->AddOnScreenDebugMessage(-1,5,FColor::Red,"Equipment has been added");
-			//заменить вещи
 			const FSerializedInventorySlot CachedSourceData = Content.Items[SourceIndex];
 			Content.Items[SourceIndex] = DestinationInventory->Content.Items[DestinationIndex];
 			DestinationInventory->Content.Items[DestinationIndex] = CachedSourceData;
 
 			Content.MarkItemDirty(Content.Items[SourceIndex]);
 			DestinationInventory->Content.MarkItemDirty(DestinationInventory->Content.Items[DestinationIndex]);
-
-			//найти конфликтующие вещи
+			
 			for (FSerializedInventorySlot& Slot : DestinationInventory->Content.Items)
 			{
-				//состоит ли слот в дата тейбле снаряжения
 				if (DT_Equipment->GetRowNames().Contains(Slot.Slot.ItemID) && Slot != DestinationInventory->Content.Items[DestinationIndex])
 				{
-					//итерация через все слоты брони
-					for (const EEquipmentBodyPart& BodyPart : DT_Equipment->FindRow<FEquipmentData>(Slot.Slot.ItemID,"")->OccupiedBodyParts)
+					for (const EEquipmentBodyPart& BodyPart : DT_Equipment->FindRow<FEquipmentData>(Slot.Slot.ItemID,"")->OccupiedEquipmentBodyParts)
 					{
-						//сравнение занятых элементов
-						if (DT_Equipment->FindRow<FEquipmentData>(DestinationInventory->Content.Items[DestinationIndex].Slot.ItemID,"")->OccupiedBodyParts.Contains(BodyPart))
+						if (DT_Equipment->FindRow<FEquipmentData>(DestinationInventory->Content.Items[DestinationIndex].Slot.ItemID,"")->OccupiedEquipmentBodyParts.Contains(BodyPart))
 						{
-							AddItems(Slot.Slot);
+							AddItem(Slot.Slot);
 							Slot = FSerializedInventorySlot();
 							DestinationInventory->Content.MarkItemDirty(Slot);
 						}
@@ -310,7 +313,8 @@ void UInventoryComponent::ServerMoveItem_Implementation(UInventoryComponent* Des
 				}
 			}
 		}
-		
+		DestinationInventory->InventoryUpdated();
+		InventoryUpdated();
 		return;
 	}
 	
@@ -439,5 +443,7 @@ void UInventoryComponent::ServerMoveItem_Implementation(UInventoryComponent* Des
 	Content.MarkItemDirty(SourceData);
 	DestinationInventory->Content.MarkItemDirty(DestinationData);
 	
+	DestinationInventory->InventoryUpdated();
+	InventoryUpdated();
 	GetOwner()->ForceNetUpdate();
 }

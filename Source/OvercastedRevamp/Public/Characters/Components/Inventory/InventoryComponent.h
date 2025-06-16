@@ -159,18 +159,29 @@ public:
 	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
 	
 	UFUNCTION(BlueprintCallable,BlueprintPure)
-	TArray<FSerializedInventorySlot> GetItems()
+	TArray<FSerializedInventorySlot>& GetItems()
 	{
 		return Content.Items;
 	}
 	
-	UFUNCTION(BlueprintSetter)
+	UFUNCTION(BlueprintCallable,Category="Inventory")
 	void SetItems(const TArray<FSerializedInventorySlot>& InItems)
 	{
 		Content.Items = InItems;
 		Content.MarkArrayDirty();
+		GetOwner()->ForceNetUpdate();
 	};
+	
+	UFUNCTION(BlueprintCallable,Category="Inventory|Replication")
+	void MarkInventorySlotDirty(const int Index)
+	{
+		GetOwner()->ForceNetUpdate();
+		Content.MarkItemDirty(Content.Items[Index]);
+	}
 
+	UFUNCTION(BlueprintCallable,Category="Inventory|Replication")
+	void EditSlotTag(const int Index,const EItemTags Tag,const FName NewValue);
+	
 	UFUNCTION(Server,BlueprintCallable,Category="Inventory",Unreliable)
 	void ServerMoveItem(UInventoryComponent* DestinationInventory,const int DestinationIndex,const int SourceIndex ,const int Divider,const int SourceSlotContentIndex = -1,const int DestinationSlotContentIndex = -1);
 
@@ -189,9 +200,6 @@ protected:
 private:
 	UFUNCTION()
 	void OnRep_Content();
-	
-    UFUNCTION(Client,BlueprintCallable,Category="Inventory",Unreliable)
-	void OC_InventoryUpdated();
 	
 	void InventoryUpdated();
 	
@@ -212,8 +220,10 @@ private:
 public:
 	
 	UFUNCTION(BlueprintCallable)
-	bool AddItems(FInventorySlot NewItem);
-	
+	bool AddItem(FInventorySlot NewItem);
+
+	UFUNCTION(BlueprintCallable)
+	bool AddItems(TArray<FInventorySlot> NewItems);
 };
 
 

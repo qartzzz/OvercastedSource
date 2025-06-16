@@ -4,17 +4,19 @@
 
 #include "CoreMinimal.h"
 #include "UObject/Interface.h"
-#include "IWeapon.generated.h"
+#include "IWeaponInteraction.generated.h"
 UENUM(BlueprintType)
 enum class EWeaponAction : uint8
 {
 	Attack UMETA(DisplayName="Attack"),
 	Attack2 UMETA(DisplayName="Attack2"),
+	AttackRelease UMETA(DisplayName="AttackRelease"),
+	Attack2Release UMETA(DisplayName="Attack2Release"),
 	Reload UMETA(DisplayName="Reload"),
 };
 // This class does not need to be modified.
 UINTERFACE()
-class UIWeapon : public UInterface
+class UIWeaponInteraction : public UInterface
 {
 	GENERATED_BODY()
 };
@@ -22,7 +24,7 @@ class UIWeapon : public UInterface
 /**
  * 
  */
-class OVERCASTEDREVAMP_API IIWeapon
+class OVERCASTEDREVAMP_API IIWeaponInteraction
 {
 	GENERATED_BODY()
 

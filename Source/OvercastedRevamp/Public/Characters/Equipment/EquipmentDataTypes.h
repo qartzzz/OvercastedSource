@@ -12,9 +12,9 @@ class OVERCASTEDREVAMP_API EquipmentDataTypes
 public:
 	EquipmentDataTypes();
 	~EquipmentDataTypes();
+
+	
 };
-
-
 
 UENUM(BlueprintType)
 enum class EEquipmentBodyPart : uint8
@@ -30,16 +30,20 @@ enum class EEquipmentBodyPart : uint8
 	Feet
 };
 
+UENUM(BlueprintType)
+enum class EBodyPart : uint8
+{
+	None,
+	Head,
+	Body,
+	Legs,
+};
+
 USTRUCT(BlueprintType)
-struct OVERCASTEDREVAMP_API FEquipmentData : public FTableRowBase
+struct FEquipmentProtection
 {
 	GENERATED_BODY()
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TSoftObjectPtr<USkeletalMesh> SkeletalMesh;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-    TSoftObjectPtr<USkeletalMesh> FPSSkeletalMesh;
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TArray<EEquipmentBodyPart> OccupiedBodyParts;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float FirearmProtection;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -53,5 +57,35 @@ struct OVERCASTEDREVAMP_API FEquipmentData : public FTableRowBase
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float HeatProtection;
 
-	FEquipmentData() : OccupiedBodyParts(TArray<EEquipmentBodyPart>()), FirearmProtection(0), MeleeProtection(0),AnimalsProtection(0),RadiationProtection(0),ColdProtection(0),HeatProtection(0) {}
+	FEquipmentProtection operator+(const FEquipmentProtection& rhs)
+	{
+		FirearmProtection += rhs.FirearmProtection;
+		MeleeProtection += rhs.MeleeProtection;
+		AnimalsProtection += rhs.AnimalsProtection;
+		RadiationProtection += rhs.RadiationProtection;
+		ColdProtection += rhs.ColdProtection;
+		HeatProtection += rhs.HeatProtection;
+		
+		return *this;
+	}
+	
+	FEquipmentProtection(const float InFirearmProtection = 0,const float InMeleeProtection = 0,const float InAnimalsProtection = 0,const float InRadiationProtection = 0,const float InColdProtection = 0,const float InHeatProtection = 0) : FirearmProtection(InFirearmProtection), MeleeProtection(InMeleeProtection), AnimalsProtection(InAnimalsProtection),RadiationProtection(InRadiationProtection), ColdProtection(InColdProtection), HeatProtection(InHeatProtection) {}
+};
+
+USTRUCT(BlueprintType)
+struct OVERCASTEDREVAMP_API FEquipmentData : public FTableRowBase
+{
+	GENERATED_BODY()
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TSoftObjectPtr<USkeletalMesh> SkeletalMesh;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+    TSoftObjectPtr<USkeletalMesh> FPSSkeletalMesh;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<EEquipmentBodyPart> OccupiedEquipmentBodyParts;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<EBodyPart> OccupiedBodyParts;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FEquipmentProtection Protection;
+
+	FEquipmentData() : OccupiedEquipmentBodyParts(TArray<EEquipmentBodyPart>()), Protection(FEquipmentProtection()) {}
 };

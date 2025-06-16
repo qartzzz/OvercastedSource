@@ -85,7 +85,7 @@ void UWorkbenchComponent::SR_RemoveCraftByIndex_Implementation(const int& Index)
 			FInventorySlot ItemToAdd;
 			ItemToAdd.ItemID = Row.ItemID;
 			ItemToAdd.Amount = Row.Amount*QueueSlot.Amount;
-			OwnerInventory->AddItems(ItemToAdd);
+			OwnerInventory->AddItem(ItemToAdd);
 		}
 
 		CraftingQueue.CraftingQueue.RemoveAt(Index);
@@ -121,7 +121,7 @@ void UWorkbenchComponent::SR_RemoveCraftByName_Implementation(const FName& ItemI
 					FInventorySlot ItemToAdd;
 					ItemToAdd.ItemID = Row.ItemID;
 					ItemToAdd.Amount = Row.Amount*Slot.Amount;
-					OwnerInventory->AddItems(ItemToAdd);
+					OwnerInventory->AddItem(ItemToAdd);
 				}
 				
 				CraftingQueue.CraftingQueue.RemoveAt(i);
@@ -155,7 +155,7 @@ void UWorkbenchComponent::CraftTick()
     	FInventorySlot Slot;
     	Slot.ItemID = CraftingQueueSlot.ItemID;
     	Slot.Amount = AmountToAdd;
-    	OwnerInventory->AddItems(Slot);
+    	OwnerInventory->AddItem(Slot);
     	
     	if (CraftingQueueSlot.Amount == 0)
     	{

@@ -19,11 +19,6 @@ void FExpense::PostReplicatedChange(const FExpensesArray& InArraySerializer)
 	
 }
 
-bool FExpensesArray::NetDeltaSerialize(FNetDeltaSerializeInfo& DeltaParms)
-{
-	return FastArrayDeltaSerialize<FExpense,FExpensesArray>(Expenses,DeltaParms,*this);
-}
-
 UExpensesComponent::UExpensesComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;

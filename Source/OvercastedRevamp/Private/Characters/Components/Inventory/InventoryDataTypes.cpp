@@ -6,13 +6,14 @@
 
 FName UInventoryDataTypes::FindItemTag(TArray<FItemTags> Tags , EItemTags Key)
 {
-	for (FItemTags Tag : Tags)
+	for (FItemTags& Tag : Tags)
 	{
 		if (Tag.Key == Key)
 		{
 			return Tag.Value;
 		}
 	}
+	
 	return "";
 }
 

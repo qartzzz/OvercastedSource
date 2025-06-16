@@ -8,3 +8,13 @@ float UDamageTypeBase::GetDamageMultiplier(const EObjectTypes& ObjectType)
     return DamageMultipliers.Contains(ObjectType) ? DamageMultipliers.FindRef(ObjectType) : 1;
 }
 
+bool UDamageTypeBase::HaveDamageTypeTag_Implementation(const EDamageTypeTags Tag)
+{
+    return Tags.Contains(Tag);
+}
+
+const TArray<EDamageTypeTags> UDamageTypeBase::GetDamageTypeTags_Implementation()
+{
+    return Tags;
+}
+

@@ -3,11 +3,14 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "GameFramework/DamageType.h"
+#include "Interfaces/IDamageTypeInfo.h"
 #include "DamageTypeBase.generated.h"
 
 /**
  * 
  */
+
+
 UENUM(Blueprintable)
 enum class EObjectTypes : uint8
 {
@@ -26,12 +29,18 @@ enum class EObjectTypes : uint8
 };
 
 UCLASS()
-class OVERCASTEDREVAMP_API UDamageTypeBase : public UDamageType
+class OVERCASTEDREVAMP_API UDamageTypeBase : public UDamageType , public IIDamageTypeInfo
 {
 	GENERATED_BODY()
 	
 public:
+	TArray<EDamageTypeTags> Tags;
+	
 	TMap<EObjectTypes, float> DamageMultipliers;
 
 	float GetDamageMultiplier(const EObjectTypes& ObjectType);
+
+	bool HaveDamageTypeTag_Implementation(const EDamageTypeTags Tag) override;
+
+	const TArray<EDamageTypeTags> GetDamageTypeTags_Implementation() override;
 };

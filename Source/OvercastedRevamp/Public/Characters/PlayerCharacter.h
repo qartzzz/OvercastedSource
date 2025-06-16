@@ -6,6 +6,7 @@
 #include "Characters/CharacterBase.h"
 #include "InputAction.h"
 #include "Camera/CameraComponent.h"
+#include "Components/Expenses/ExpensesComponent.h"
 #include "Components/Inventory/InventoryComponent.h"
 #include "Engine/StreamableManager.h"
 #include "PlayerCharacter.generated.h"
@@ -41,6 +42,8 @@ public:
 
 	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
 
+	UPROPERTY(BlueprintReadOnly,Replicated)
+	uint8 CurrentSlot = 255;
 	
 private:
 	bool CanJump = true;
@@ -72,10 +75,17 @@ private:
 
 	UPROPERTY(Category= "Components",EditDefaultsOnly,BlueprintReadWrite,meta = (AllowPrivateAccess = "true"))
 	UInventoryComponent* Inventory;
-	void JumpDelay();
+
+	UPROPERTY(Category= "Components",EditDefaultsOnly,BlueprintReadWrite,meta = (AllowPrivateAccess = "true"))
+	UInventoryComponent* Equipment;
+	
+	UPROPERTY(Category= "Components",EditDefaultsOnly,BlueprintReadWrite,meta = (AllowPrivateAccess = "true"))
+	UExpensesComponent* Expenses;
 	
 	virtual float TakeDamage(float DamageAmount, const FDamageEvent& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
 
+	void JumpDelay();
+	
 	UFUNCTION(Server, Unreliable)
 	void ServerChangeSlot(const uint8 Slot);
 
@@ -93,6 +103,33 @@ protected:
 	void ActionJump(const FInputActionValue& Value);
 
 	void ChangeSlots();
+
+	void ChangeSlot(const uint8 Slot);
+	
+	void Interact();
+	
+    UFUNCTION(Server, Unreliable)
+	void SR_Interact();
+
+	void Attack();
+
+	void AttackReleased();
+	
+	UFUNCTION(Server, Unreliable)
+	void SR_Attack(const bool Released);
+
+	void SecondAttack();
+
+	void SecondAttackReleased();
+	
+	UFUNCTION(Server, Unreliable)
+	void SR_SecondAttack(const bool Released);
+
+	void Reload();
+
+	UFUNCTION(Server, Unreliable)
+	void SR_Reload();
+	
 	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "EnhancedInput")
 	UInputMappingContext* InputMapping;
@@ -107,6 +144,9 @@ protected:
 	UInputAction* InputActionJump;
 	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "EnhancedInput")
+	UInputAction* InputActionSlots;
+	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "EnhancedInput")
 	UInputAction* InputActionCrouch;
 	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "EnhancedInput")
@@ -116,8 +156,12 @@ protected:
 	UInputAction* InputActionAttack;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "EnhancedInput")
-	UInputAction* InputActionSlots;
+	UInputAction* InputActionSecondAttack;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "EnhancedInput")
+	UInputAction* InputActionReload;
+	
+	
 	UFUNCTION()
 	void OnComponentLoaded();
 	
@@ -125,8 +169,6 @@ protected:
 private:
 	UPROPERTY()
 	UActorComponent* CurrentWeapon = nullptr;
-	
-	uint8 CurrentSlot = 255;
 
 	uint8 CurrentSlotUniqueID = 255;
 
@@ -137,8 +179,6 @@ private:
 
 	UFUNCTION()
 	void OnRep_CharacterState();
-	
-	void ChangeSlot(const uint8 Slot);
 
 	void DestroyWeapon();
 	
