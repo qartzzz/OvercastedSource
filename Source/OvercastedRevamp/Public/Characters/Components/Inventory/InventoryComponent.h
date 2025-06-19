@@ -55,7 +55,7 @@ struct FInventorySlot
 	{
 		return Data.ItemID != ItemID || Data.Amount != Amount || Data.ItemTags != ItemTags;
 	}
-	FInventorySlot(FName InItemID = "",int InAmount = 0,TArray<FItemTags> InItemTags = {}) : ItemID(""),Amount(0),ItemTags({}){}
+	FInventorySlot(const FName ItemID = "",const int Amount = 0,const TArray<FItemTags>& ItemTags = {}) : ItemID(ItemID),Amount(Amount),ItemTags(ItemTags){}
 };
 
 USTRUCT(BlueprintType,Blueprintable)
@@ -120,6 +120,10 @@ UInventoryComponent();
 	UPROPERTY(BlueprintAssignable)
 	FOnItemsChanged OnItemsChanged;
 
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnItemAdded,const FInventorySlot&,NewItem);
+	UPROPERTY(BlueprintAssignable)
+	FOnItemAdded OnItemAdded;
+	
 	
 /**PROPERTIES*/
 
@@ -198,6 +202,9 @@ protected:
 	virtual void BeginPlay() override;
 
 private:
+	UFUNCTION(Client,Unreliable)
+	void OC_ItemAdded(const FInventorySlot& NewItem);
+	
 	UFUNCTION()
 	void OnRep_Content();
 	

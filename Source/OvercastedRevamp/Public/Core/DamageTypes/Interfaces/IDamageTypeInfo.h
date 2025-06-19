@@ -3,16 +3,11 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Core/DamageTypes/DamageTypesData.h"
 #include "UObject/Interface.h"
 #include "IDamageTypeInfo.generated.h"
 
-UENUM(Blueprintable)
-enum class EDamageTypeTags: uint8
-{
-	CanFarmWood UMETA(DisplayName = "Can farm wood"),
-	CanFarmNodes UMETA(DisplayName = "Can farm nodes"),
-	
-};
+
 // This class does not need to be modified.
 UINTERFACE()
 class UIDamageTypeInfo : public UInterface
@@ -34,4 +29,7 @@ public:
 	
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent,Category="DamageTypeInfo")
 	const TArray<EDamageTypeTags> GetDamageTypeTags();
+
+	UFUNCTION(BlueprintCallable, BlueprintNativeEvent,Category="DamageTypeInfo")
+	const EDamageType GetDamageType();
 };

@@ -59,7 +59,10 @@ protected:
 
 inline void ACharacterBase::SetCurrentAnimation(const EItemAnimations Animation)
 {
-	CurrentAnimation = Animation;
-	MARK_PROPERTY_DIRTY_FROM_NAME(ThisClass,CurrentAnimation,this);
-	ForceNetUpdate();
+	if (CurrentAnimation != Animation)
+	{
+		ForceNetUpdate();
+		MARK_PROPERTY_DIRTY_FROM_NAME(ThisClass,CurrentAnimation,this);
+		CurrentAnimation = Animation;
+	}
 }

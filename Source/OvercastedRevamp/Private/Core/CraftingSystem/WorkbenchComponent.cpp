@@ -11,6 +11,7 @@ UWorkbenchComponent::UWorkbenchComponent()
 	// off to improve performance if you don't need them.
 	PrimaryComponentTick.bCanEverTick = false;
     SetIsReplicatedByDefault(true);
+	DT_ItemData = ConstructorHelpers::FObjectFinder<UDataTable>(TEXT("/Game/Items/DT_Items.DT_Items")).Object;
 	DT_ItemCrafts = ConstructorHelpers::FObjectFinder<UDataTable>(TEXT("/Game/Core/CraftingSystem/DT_ItemCraft.DT_ItemCraft")).Object;
 }
 
@@ -82,6 +83,7 @@ void UWorkbenchComponent::SR_RemoveCraftByIndex_Implementation(const int& Index)
 		const FCraftingQueueSlot& QueueSlot = CraftingQueue.CraftingQueue[Index];
 		for (const FRecipeRow& Row : DT_ItemCrafts->FindRow<FItemCraftData>(QueueSlot.ItemID,"")->RecipeRows)
 		{
+			
 			FInventorySlot ItemToAdd;
 			ItemToAdd.ItemID = Row.ItemID;
 			ItemToAdd.Amount = Row.Amount*QueueSlot.Amount;
@@ -154,14 +156,21 @@ void UWorkbenchComponent::CraftTick()
     	
     	FInventorySlot Slot;
     	Slot.ItemID = CraftingQueueSlot.ItemID;
+    	int MaxDurability = DT_ItemData->FindRow<FItemData>(CraftingQueueSlot.ItemID,"")->ConstantItemInts.FindRef(EConstantItemTags::MaxDurability);
     	Slot.Amount = AmountToAdd;
+    	Slot.ItemTags.Add(FItemTags(EItemTags::Durability,FName(FString::FromInt(MaxDurability))));
     	OwnerInventory->AddItem(Slot);
+
     	
     	if (CraftingQueueSlot.Amount == 0)
     	{
     		CraftingQueue.CraftingQueue.RemoveAt(0);
     		CraftingQueue.MarkArrayDirty();
     	}
+	    else
+	    {
+	    	CraftingQueueSlot.TimeRemaining = DT_ItemCrafts->FindRow<FItemCraftData>(CraftingQueueSlot.ItemID,"")->CraftTime;
+	    }
 
     	if (CraftingQueue.CraftingQueue.IsEmpty())
     	{

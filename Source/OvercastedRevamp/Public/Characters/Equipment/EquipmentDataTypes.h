@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Core/DamageTypes/DamageTypesData.h"
 #include "EquipmentDataTypes.generated.h"
 /**
  * 
@@ -68,7 +69,22 @@ struct FEquipmentProtection
 		
 		return *this;
 	}
-	
+
+	float GetTypeProtection(const EDamageType DamageType) const
+	{
+		switch (DamageType) {
+		case EDamageType::FirearmDamage:
+			return FirearmProtection;
+			break;
+		case EDamageType::MeleeDamage:
+			return MeleeProtection;
+			break;
+		case EDamageType::AnimalDamage:
+			return AnimalsProtection;
+			break;
+		}
+	    return 0.0f;
+	}
 	FEquipmentProtection(const float InFirearmProtection = 0,const float InMeleeProtection = 0,const float InAnimalsProtection = 0,const float InRadiationProtection = 0,const float InColdProtection = 0,const float InHeatProtection = 0) : FirearmProtection(InFirearmProtection), MeleeProtection(InMeleeProtection), AnimalsProtection(InAnimalsProtection),RadiationProtection(InRadiationProtection), ColdProtection(InColdProtection), HeatProtection(InHeatProtection) {}
 };
 

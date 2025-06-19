@@ -5,9 +5,9 @@
 #include "CoreMinimal.h"
 #include "Characters/Components/Inventory/InventoryComponent.h"
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
+#include "Core/DamageTypes/DamageTypesData.h"
 #include "GameFramework/Actor.h"
 #include "Interfaces/IPlayerWorldInteraction.h"
-#include "Interfaces/IPluginManager.h"
 #include "Net/Serialization/FastArraySerializer.h"
 #include "PhysicalMaterials/PhysicalMaterial.h"
 #include "ResourcesManager.generated.h"
@@ -27,6 +27,8 @@ enum class EResourceType : uint8
 	OilBarrel,
 	PoorBarrel,
 	Barrel,
+	Hemp,
+	Mushroom,
 	Max
 };
 
@@ -105,8 +107,11 @@ struct FResourceData : public FTableRowBase
 {
 	GENERATED_BODY()
 	
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere,Category="ActorSpawn")
 	TSubclassOf<AActor> ResourceClass;
+
+	UPROPERTY(EditAnywhere,Category="ActorSpawn")
+	EDamageTypeTags DamageTagForTrigger;
 	
 	UPROPERTY(EditAnywhere)
 	//Chance in range 0 - 100
@@ -123,8 +128,11 @@ struct FResourceData : public FTableRowBase
 	UPROPERTY(EditAnywhere)
 	int MaxAmountInGrid;
 
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere,Category = "Pickup")
 	TArray<FInventorySlot> PickUpReward;
+
+	UPROPERTY(EditAnywhere,Category = "Pickup")
+	TObjectPtr<USoundBase> PickUpSound;
 	
 	float FindSpawnChance(UPhysicalMaterial* PhysicalMaterial)
 	{
@@ -159,7 +167,7 @@ public:
 	
 private:
 	
-	virtual float InternalTakeRadialDamage(float Damage, struct FRadialDamageEvent const& RadialDamageEvent, class AController* EventInstigator, AActor* DamageCauser) override;
+	virtual float InternalTakePointDamage(float Damage, struct FPointDamageEvent const& PointDamageEvent, class AController* EventInstigator, AActor* DamageCauser) override;
 	
 	bool Interact_Implementation(APlayerController* PlayerController,const FHitResult& HitResult) override;
 	
@@ -187,6 +195,9 @@ private:
 
 	void RemoveResourceFromArray(FFastResource& Resource);
 
+	UFUNCTION(NetMulticast,Unreliable)
+	void MC_SpawnPickUpSound(const FName ResourceName,const FVector Location);
+	
 	UPROPERTY()
 	TMap<EResourceType,UHierarchicalInstancedStaticMeshComponent*> HISMs;
 	
@@ -222,8 +233,12 @@ private:
 
 	UPROPERTY(VisibleAnywhere,meta = (AllowPrivateAccess=true))
 	UHierarchicalInstancedStaticMeshComponent* OilBarrels;
-
 	
+	UPROPERTY(VisibleAnywhere,meta = (AllowPrivateAccess=true))
+	UHierarchicalInstancedStaticMeshComponent* HempBushes;
+
+	UPROPERTY(VisibleAnywhere,meta = (AllowPrivateAccess=true))
+	UHierarchicalInstancedStaticMeshComponent* Mushrooms;
 };
 
 

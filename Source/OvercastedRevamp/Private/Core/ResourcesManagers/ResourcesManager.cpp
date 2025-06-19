@@ -6,6 +6,7 @@
 #include "Core/DamageTypes/DamageTypeBase.h"
 #include "Engine/DamageEvents.h"
 #include "GameFramework/GameModeBase.h"
+#include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
 
 // Sets default values
@@ -40,7 +41,11 @@ AResourcesManager::AResourcesManager()
 	PoorBarrels->SetupAttachment(RootComponent);
 	OilBarrels = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>("OilBarrels");
 	OilBarrels->SetupAttachment(RootComponent);
-
+	HempBushes = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("HempBushes"));
+	HempBushes->SetupAttachment(RootComponent);
+	Mushrooms = CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("Mushrooms"));
+	Mushrooms->SetupAttachment(RootComponent);
+	
 	DT_ResourcesData = ConstructorHelpers::FObjectFinder<UDataTable>(TEXT("/Game/Core/ResourcesManager/DT_ResourcesProperties.DT_ResourcesProperties")).Object;
 }
 
@@ -62,9 +67,12 @@ void AResourcesManager::BeginPlay()
 	HISMs.Add(static_cast<EResourceType>(6),SmallSulfurNodes);
 	HISMs.Add(static_cast<EResourceType>(7),Stumps);
 	HISMs.Add(static_cast<EResourceType>(8),LogPiles);
-
+	HISMs.Add(static_cast<EResourceType>(12),HempBushes);
+	HISMs.Add(static_cast<EResourceType>(13),Mushrooms);
+	
 	if (HasAuthority())
 	{
+		SpawnBunchOfAllResources();
 		FTimerHandle TimerHandleResourcesSpawn;
 		GetWorldTimerManager().SetTimer(TimerHandleResourcesSpawn,this,&AResourcesManager::SpawnBunchOfAllResources,ResourcesRespawnRate,true,ResourcesRespawnRate * FMath::RandRange(-0.9,2.0));
 	}
@@ -130,7 +138,6 @@ void AResourcesManager::OnRep_Resources()
 			HISM->GetInstanceTransform(Resource.HISMIndex,OutInstanceTransform);
 			if (OutInstanceTransform.GetLocation() != Resource.Location)
 			{
-				GEngine->AddOnScreenDebugMessage(-1,5,FColor::Red,"ResourcesLocationsNotIdentical");
 				HISM->UpdateInstanceTransform(Resource.HISMIndex,FTransform(Resource.Rotation,Resource.Location),true);
 			}
 		}
@@ -175,18 +182,18 @@ void AResourcesManager::RemoveResourceFromArray(FFastResource& Resource)
 	AvailableResources.MarkItemDirty(Resource);
 }
 
-float AResourcesManager::InternalTakeRadialDamage(float Damage, struct FRadialDamageEvent const& RadialDamageEvent, class AController* EventInstigator, AActor* DamageCauser)
+float AResourcesManager::InternalTakePointDamage(float Damage, struct FPointDamageEvent const& PointDamageEvent, class AController* EventInstigator, AActor* DamageCauser)
 {
-   const FHitResult HitResult = RadialDamageEvent.ComponentHits[0];
+    const FHitResult HitResult = PointDamageEvent.HitInfo;
 	
 	typedef UHierarchicalInstancedStaticMeshComponent UHISM;
-	if (HitResult.Component.IsValid() && RadialDamageEvent.DamageTypeClass.Get() == UDamageTypeBase::StaticClass() && IIDamageTypeInfo::Execute_HaveDamageTypeTag(RadialDamageEvent.DamageTypeClass->GetDefaultObject<UDamageTypeBase>(),EDamageTypeTags::CanFarmNodes))
+	if (HitResult.Component.IsValid() && PointDamageEvent.DamageTypeClass->ImplementsInterface(UIDamageTypeInfo::StaticClass()))
 	{
 		const FName& ComponentTag = HitResult.Component->ComponentTags[0];
-		if (DT_ResourcesData->GetRowNames().Contains(ComponentTag))
+		const FResourceData* ResourceData = DT_ResourcesData->FindRow<FResourceData>(ComponentTag,"");
+		if (DT_ResourcesData->GetRowNames().Contains(ComponentTag) && IIDamageTypeInfo::Execute_HaveDamageTypeTag(PointDamageEvent.DamageTypeClass->GetDefaultObject<UDamageTypeBase>(),ResourceData->DamageTagForTrigger))
 		{
-			const FResourceData* ResourceData = DT_ResourcesData->FindRow<FResourceData>(ComponentTag,"");
-			if (!ResourceData->PickUpReward.IsEmpty())
+			if (ResourceData->PickUpReward.IsEmpty())
 			{
 				const UHISM* HISM = Cast<UHISM>(HitResult.Component);
 				
@@ -214,6 +221,7 @@ bool AResourcesManager::Interact_Implementation(APlayerController* PlayerControl
 	typedef UHierarchicalInstancedStaticMeshComponent UHISM;
     if (HitResult.Component.IsValid())
     {
+    	 GEngine->AddOnScreenDebugMessage(-1,5,FColor::Red,"Interacting with player");
     	const FName& ComponentTag = HitResult.Component->ComponentTags[0];
     	if (DT_ResourcesData->GetRowNames().Contains(ComponentTag))
     	{
@@ -229,12 +237,16 @@ bool AResourcesManager::Interact_Implementation(APlayerController* PlayerControl
     		
     			const EResourceType ResourceType = GetKeyByHISM(Cast<UHISM>(HitResult.Component.Get()));
     			const FFastResource ResourceToRemove = FFastResource(ResourceType,ResourceLocation,ResourceRotation,HitResult.Item);
-    		
+
+    			MC_SpawnPickUpSound(ComponentTag,ResourceLocation);
+    			
     			RemoveResourceFromArray(AvailableResources.Entries[AvailableResources.Entries.Find(ResourceToRemove)]);
 
     			UActorComponent* ActorComponent = PlayerController->GetPawn()->GetComponentsByTag(UInventoryComponent::StaticClass(),"Inventory")[0];
     			UInventoryComponent* InventoryComponent = Cast<UInventoryComponent>(ActorComponent);
     			InventoryComponent->AddItems(ResourceData->PickUpReward);
+
+    			
     			return true;
     		}
     	}
@@ -242,6 +254,11 @@ bool AResourcesManager::Interact_Implementation(APlayerController* PlayerControl
 	return false;
 }
 
+
+void AResourcesManager::MC_SpawnPickUpSound_Implementation(const FName ResourceName,const FVector Location)
+{
+	UGameplayStatics::SpawnSoundAtLocation(GetWorld(),DT_ResourcesData->FindRow<FResourceData>(ResourceName,"")->PickUpSound,Location);
+}
 
 EResourceType AResourcesManager::GetKeyByHISM(const UHierarchicalInstancedStaticMeshComponent* HISM)
 {

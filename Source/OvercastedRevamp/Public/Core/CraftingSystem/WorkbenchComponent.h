@@ -65,6 +65,9 @@ private:
 	UPROPERTY()
 	UDataTable* DT_ItemCrafts;
 
+	UPROPERTY()
+	UDataTable* DT_ItemData;
+	
 	UFUNCTION()
 	void CraftTick();
 };

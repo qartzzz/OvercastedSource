@@ -34,13 +34,18 @@ class OVERCASTEDREVAMP_API UDamageTypeBase : public UDamageType , public IIDamag
 	GENERATED_BODY()
 	
 public:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "DamageType | Tags")
 	TArray<EDamageTypeTags> Tags;
-	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "DamageType | Multipliers")
 	TMap<EObjectTypes, float> DamageMultipliers;
-
+	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "DamageType ")
+	EDamageType DamageType;
+	
 	float GetDamageMultiplier(const EObjectTypes& ObjectType);
 
 	bool HaveDamageTypeTag_Implementation(const EDamageTypeTags Tag) override;
 
 	const TArray<EDamageTypeTags> GetDamageTypeTags_Implementation() override;
+
+	const EDamageType GetDamageType_Implementation() override;
 };

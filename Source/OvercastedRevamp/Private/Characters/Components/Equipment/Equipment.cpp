@@ -39,6 +39,7 @@ void UEquipment::BeginPlay()
 void UEquipment::OnRep_Equipment()
 {
 	GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, "Updating Equipment");
+	
 	EquipmentProtection.FindOrAdd(EBodyPart::Body,FEquipmentProtection());
 	EquipmentProtection.FindOrAdd(EBodyPart::Head,FEquipmentProtection());
 	EquipmentProtection.FindOrAdd(EBodyPart::Legs,FEquipmentProtection());

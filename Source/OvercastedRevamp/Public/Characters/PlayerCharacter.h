@@ -6,6 +6,7 @@
 #include "Characters/CharacterBase.h"
 #include "InputAction.h"
 #include "Camera/CameraComponent.h"
+#include "Components/Equipment/Equipment.h"
 #include "Components/Expenses/ExpensesComponent.h"
 #include "Components/Inventory/InventoryComponent.h"
 #include "Engine/StreamableManager.h"
@@ -69,21 +70,34 @@ private:
 	
 	UPROPERTY(Category= "Character",EditDefaultsOnly,BlueprintReadWrite,meta = (AllowPrivateAccess = "true"))
 	USkeletalMeshComponent* ThirdPersonWeapon;
-		
+	
+	UPROPERTY(Category= "Character",EditDefaultsOnly,BlueprintReadWrite,meta = (AllowPrivateAccess = "true"))
+	UStaticMeshComponent* ThirdPersonMagazine;
+	
 	UPROPERTY(Category= "Character",EditDefaultsOnly,BlueprintReadWrite,meta = (AllowPrivateAccess = "true"))
 	USkeletalMeshComponent* FirstPersonWeapon;
 
+	UPROPERTY(Category= "Character",EditDefaultsOnly,BlueprintReadWrite,meta = (AllowPrivateAccess = "true"))
+	USceneComponent* AimDownSightsPoint;
+	
+	UPROPERTY(Category= "Character",EditDefaultsOnly,BlueprintReadWrite,meta = (AllowPrivateAccess = "true"))
+	UStaticMeshComponent* FirstPersonMagazine;
+	
 	UPROPERTY(Category= "Components",EditDefaultsOnly,BlueprintReadWrite,meta = (AllowPrivateAccess = "true"))
 	UInventoryComponent* Inventory;
 
 	UPROPERTY(Category= "Components",EditDefaultsOnly,BlueprintReadWrite,meta = (AllowPrivateAccess = "true"))
-	UInventoryComponent* Equipment;
+	UInventoryComponent* EquipmentInventory;
 	
 	UPROPERTY(Category= "Components",EditDefaultsOnly,BlueprintReadWrite,meta = (AllowPrivateAccess = "true"))
 	UExpensesComponent* Expenses;
+
+	UPROPERTY(Category= "Components",EditDefaultsOnly,BlueprintReadWrite,meta = (AllowPrivateAccess = "true"))
+	UEquipment* Equipment;
 	
 	virtual float TakeDamage(float DamageAmount, const FDamageEvent& DamageEvent, AController* EventInstigator, AActor* DamageCauser) override;
 
+	virtual float InternalTakePointDamage(float Damage, struct FPointDamageEvent const& PointDamageEvent, class AController* EventInstigator, AActor* DamageCauser) override;
 	void JumpDelay();
 	
 	UFUNCTION(Server, Unreliable)

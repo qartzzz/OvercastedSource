@@ -89,7 +89,7 @@ bool UInventoryComponent::RemoveItemsForCraft(const TArray<FRecipeRow> RecipeRow
   {
 	  for (const FRecipeRow& Row : RecipeRows)
 	  {
-	  	  int Amount = Row.Amount;
+	  	  int Amount = Row.Amount * ItemAmount;
 	  	
 		  for (FSerializedInventorySlot& Slot: Content.Items)
 		  {
@@ -160,6 +160,7 @@ int UInventoryComponent::AddToEmptySlot(const FInventorySlot& NewItem,const int 
 	
 	Content.Items[EmptySlotIndex].Slot = NewItem;
 	Content.Items[EmptySlotIndex].Slot.Amount = ClampedItemAmount;
+	Content.Items[EmptySlotIndex].Slot.ItemTags = NewItem.ItemTags;
 	
 	if (DT_Items->FindRow<FItemData>(NewItem.ItemID,"")->ConstantItemInts.Contains(EConstantItemTags::ContentSlots))
 	{
@@ -191,6 +192,7 @@ void UInventoryComponent::GenerateSlotsUniqueIDs()
 
 bool UInventoryComponent::AddItem(FInventorySlot NewItem)
 {
+	int AddAmount = NewItem.Amount;
 	if (DT_Items->GetRowNames().Contains(NewItem.ItemID))
 	{
 		bool Failed = false;
@@ -212,11 +214,20 @@ bool UInventoryComponent::AddItem(FInventorySlot NewItem)
 				Failed = true;
 			}
 		}
+		
+		AddAmount -= NewItem.Amount;
+		
+		OC_ItemAdded(FInventorySlot(NewItem.ItemID,AddAmount));
 		GetOwner()->ForceNetUpdate();
 		InventoryUpdated();
 		return NewItem.Amount == 0;
 	}
 	return false;
+}
+
+void UInventoryComponent::OC_ItemAdded_Implementation(const FInventorySlot& NewItem)
+{
+	OnItemAdded.Broadcast(NewItem);
 }
 
 bool UInventoryComponent::AddItems(TArray<FInventorySlot> NewItems)

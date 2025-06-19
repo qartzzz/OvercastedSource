@@ -18,3 +18,8 @@ const TArray<EDamageTypeTags> UDamageTypeBase::GetDamageTypeTags_Implementation(
     return Tags;
 }
 
+const EDamageType UDamageTypeBase::GetDamageType_Implementation()
+{
+    return DamageType;
+}
+

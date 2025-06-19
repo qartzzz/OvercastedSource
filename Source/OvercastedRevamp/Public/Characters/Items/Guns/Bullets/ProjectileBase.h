@@ -3,7 +3,6 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Engine/DamageEvents.h"
 #include "GameFramework/Actor.h"
 #include "Core/DamageTypes/DamageTypeBase.h"
 #include "ProjectileBase.generated.h"
@@ -12,14 +11,14 @@ USTRUCT(BlueprintType)
 struct FProjectileImpacts : public FTableRowBase
 {
 	GENERATED_BODY()
-public:
-	UPROPERTY(EditAnywhere)
+
+	UPROPERTY(EditAnywhere,BlueprintReadWrite)
 	USoundBase* ImpactSound;
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere,BlueprintReadWrite)
 	UParticleSystem* ImpactParticle;
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere,BlueprintReadWrite)
 	UMaterialInterface* ImpactMaterial;
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere,BlueprintReadWrite)
 	FVector DecalSize;
 	FProjectileImpacts(USoundBase* ImpactSound = nullptr,UParticleSystem* ImpactParticle = nullptr,UMaterialInterface* ImpactMaterial = nullptr,FVector DecalSize = FVector::ZeroVector) : ImpactSound(), ImpactParticle(), ImpactMaterial(),DecalSize(FVector::ZeroVector) {}
 };
@@ -57,10 +56,8 @@ protected:
 	
 	UPROPERTY(EditDefaultsOnly)
 	float ProjectileRadius = 2;
-	
-	FDamageEvent DamageEvent;
 
-	bool WasHit;
+	bool WasHit = false;
 
 public:
 	// Called every frame
@@ -69,4 +66,6 @@ private:
 	void MoveAndTrace(const float DeltaTime);
 	UPROPERTY()
 	UDataTable* DT_Impacts;
+
+	FVector OwnerVelocity;
 };

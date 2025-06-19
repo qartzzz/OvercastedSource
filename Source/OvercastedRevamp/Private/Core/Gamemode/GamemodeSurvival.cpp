@@ -15,6 +15,10 @@ AGamemodeSurvival::AGamemodeSurvival()
 void AGamemodeSurvival::PostLogin(APlayerController* NewPlayer)
 {
 	Super::PostLogin(NewPlayer);
+	if (NewPlayer->GetPawn())
+	{
+		NewPlayer->GetPawn()->Destroy();
+	}
 }
 
 void AGamemodeSurvival::Respawn_Implementation(APlayerController* OwningController)
@@ -39,16 +43,20 @@ void AGamemodeSurvival::CalculateRespawnPoint(APlayerController* OwningControlle
 		for (int i = 0;i != 100;i++)
 		{
 			const AActor* Actor = Points[FMath::RandRange(0,Points.Num() - 1)];
-			FHitResult HitResult;
-			GetWorld()->LineTraceSingleByChannel(HitResult, Actor->GetActorLocation(), Actor->GetActorLocation() - FVector(0, 0, 550),ECollisionChannel::ECC_Visibility);
-			if (HitResult.bBlockingHit /*&& IsValid(HitResult.GetActor()) && HitResult.GetActor()->Tags.Contains("CanRespawn")*/)
+			TArray<FHitResult> HitResults;
+			GetWorld()->LineTraceMultiByChannel(HitResults, Actor->GetActorLocation(), Actor->GetActorLocation() - FVector(0, 0, 550),ECollisionChannel::ECC_Visibility);
+			for (FHitResult& HitResult : HitResults)
 			{
-				FActorSpawnParameters SpawnInfo;
-				APawn* RespawnedPawn = GetWorld()->SpawnActor<APawn>(DefaultPawnClass,FTransform(FRotator::ZeroRotator,Actor->GetActorLocation(),FVector(1,1,1)), SpawnInfo);
-				GEngine->AddOnScreenDebugMessage(-1,5,FColor::Red,"Respawned");
-				OwningController->Possess(RespawnedPawn);
-				return;
+				if (HitResult.bBlockingHit)
+				{
+					FActorSpawnParameters SpawnInfo;
+					APawn* RespawnedPawn = GetWorld()->SpawnActor<APawn>(DefaultPawnClass,FTransform(FRotator::ZeroRotator,Actor->GetActorLocation(),FVector(1,1,1)), SpawnInfo);
+					GEngine->AddOnScreenDebugMessage(-1,5,FColor::Red,"Respawned");
+					OwningController->Possess(RespawnedPawn);
+					return;
+				}
 			}
+			
 		}
 	}
 }

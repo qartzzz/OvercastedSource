@@ -1,9 +1,9 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+ // Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "Characters/Items/Guns/Bullets/ProjectileBase.h"
 
-#include "KismetTraceUtils.h"
+#include "Engine/DamageEvents.h"
 #include "Kismet/GameplayStatics.h"
 
 
@@ -12,7 +12,6 @@ AProjectileBase::AProjectileBase()
 {
 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
-	DamageEvent.DamageTypeClass = DamageType;
 	SetNetDormancy(DORM_Never);
 	SetNetCullDistanceSquared(675000000);
     bReplicates = true;
@@ -23,6 +22,10 @@ AProjectileBase::AProjectileBase()
 void AProjectileBase::BeginPlay()
 {
 	Super::BeginPlay();
+	if (GetOwner())
+	{
+		OwnerVelocity = Cast<APlayerController>(GetOwner())->GetPawn()->GetVelocity();
+	}
 }
 
 // Called every frame
@@ -43,13 +46,15 @@ void AProjectileBase::MoveAndTrace(const float DeltaTime)
 		
 		FalloffPower += FalloffPower / 10 * DeltaTime;
 		
+		GEngine->AddOnScreenDebugMessage(-1,5,FColor::Yellow,StartLocation.ToString());
+		
 		FCollisionQueryParams CQP;
 		CQP.AddIgnoredActor(GetOwner());
 		CQP.AddIgnoredActor(this);
 		
 		FCollisionShape CollisionShape;
 		CollisionShape.SetSphere(ProjectileRadius);
-		GetWorld()->SweepSingleByChannel(Hit,StartLocation,EndLocation,FQuat(0,0,0,0),ECC_Visibility,CollisionShape,CQP);
+		GetWorld()->SweepSingleByChannel(Hit,StartLocation + OwnerVelocity * DeltaTime,EndLocation + OwnerVelocity * DeltaTime,FQuat(0,0,0,0),ECC_Visibility,CollisionShape,CQP);
 		
 		if (Hit.bBlockingHit && !WasHit)
 		{
@@ -58,10 +63,13 @@ void AProjectileBase::MoveAndTrace(const float DeltaTime)
 			if (IsValid(Hit.GetActor()))
 			{
 				AController* Controller = nullptr;
-			
+				FDamageEvent DamageEvent;
+				
 				Controller = IsValid(GetOwner()) ? GetOwner()->GetInstigatorController() : nullptr;
+				DamageEvent.DamageTypeClass = DamageType;
 				
 				Hit.GetActor()->TakeDamage(DamageAmount,DamageEvent,nullptr,GetOwner());
+				GEngine->AddOnScreenDebugMessage(-1,5,FColor::Red,"Hit");
 			} 
 			Destroy();
 		}
@@ -73,8 +81,11 @@ void AProjectileBase::MoveAndTrace(const float DeltaTime)
 	else
 	{
 		FHitResult Hit;
+		
 		const FVector StartLocation = GetActorLocation();
 		const FVector EndLocation = StartLocation + GetActorForwardVector() * Speed * DeltaTime;
+
+		GEngine->AddOnScreenDebugMessage(-1,5,FColor::Blue,StartLocation.ToString());
 		
 		FalloffPower += FalloffPower / 10 * DeltaTime;
 		
@@ -85,7 +96,7 @@ void AProjectileBase::MoveAndTrace(const float DeltaTime)
 		
 		FCollisionShape CollisionShape;
 		CollisionShape.SetSphere(ProjectileRadius);
-		GetWorld()->SweepSingleByChannel(Hit,StartLocation,EndLocation,FQuat(0,0,0,0),ECC_Visibility,CollisionShape,CQP);
+		GetWorld()->SweepSingleByChannel(Hit,StartLocation + OwnerVelocity * DeltaTime,EndLocation + OwnerVelocity * DeltaTime,FQuat(0,0,0,0),ECC_Visibility,CollisionShape,CQP);
 		
 		if (Hit.bBlockingHit && !WasHit)
 		{

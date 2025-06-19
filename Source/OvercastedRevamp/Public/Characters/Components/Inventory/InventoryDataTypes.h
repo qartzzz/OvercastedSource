@@ -10,6 +10,10 @@ enum class EItemAnimations : uint8
 {
 	None UMETA(DisplayName = "None"),
 	MP5 UMETA(DisplayName = "MP5"),
+	StoneAxe UMETA(DisplayName = "Stone axe"),
+	StonePickaxe UMETA(DisplayName = "Stone pickaxe"),
+	IronAxe UMETA(DisplayName = "Iron axe"),
+	IronPickAxe UMETA(DisplayName = "Iron pickaxe"),
 };
 UENUM(BlueprintType)
 enum class EContainerTags : uint8
@@ -35,7 +39,8 @@ public:
 	EItemTags Key;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Inventory",meta = (DisplayName = "Amount", MakeStructureDefaultValue = "0"))
     FName Value;
-	FItemTags(EItemTags Key = EItemTags::None, FName Value = "") : Key(EItemTags::None), Value("") {}
+	
+	FItemTags(EItemTags Key = EItemTags::None, FName Value = "") : Key(Key), Value(Value) {}
 
 	bool operator==(const FItemTags& Data) const
 	{

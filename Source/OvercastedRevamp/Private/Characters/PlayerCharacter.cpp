@@ -23,6 +23,10 @@ APlayerCharacter::APlayerCharacter()
 	ThirdPersonWeapon = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("Weapon"));
 	ThirdPersonWeapon->SetupAttachment(GetMesh(),"hand_r");
 	ThirdPersonWeapon->SetOwnerNoSee(true);
+
+	ThirdPersonMagazine = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("TPSMagazine"));
+	ThirdPersonMagazine->SetupAttachment(ThirdPersonWeapon,"Magazine");
+	ThirdPersonMagazine->SetOwnerNoSee(true);
 	
 	Camera = CreateDefaultSubobject<UCameraComponent>(FName("CameraComponent"));
 	Camera->SetupAttachment(GetCapsuleComponent());
@@ -38,12 +42,21 @@ APlayerCharacter::APlayerCharacter()
 	FirstPersonWeapon->SetupAttachment(FirstPersonMesh,"hand_r");
 	FirstPersonWeapon->SetOnlyOwnerSee(true);
 
+	AimDownSightsPoint = CreateDefaultSubobject<USceneComponent>(TEXT("AimDownSightsPoint"));
+	AimDownSightsPoint->SetupAttachment(FirstPersonWeapon,"AimDownSightsPoint");
+	
+	FirstPersonMagazine = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("FPSMagazine"));
+	FirstPersonMagazine->SetupAttachment(FirstPersonWeapon,"Magazine");
+	FirstPersonMagazine->SetOnlyOwnerSee(true);
+	
 	DT_Items = ConstructorHelpers::FObjectFinder<UDataTable>(TEXT("/Game/Items/DT_Items.DT_Items")).Object;
 	
 	Inventory = CreateDefaultSubobject<UInventoryComponent>(TEXT("Inventory"));
 
-	Equipment = CreateDefaultSubobject<UInventoryComponent>(TEXT("Equipment"));
+	EquipmentInventory = CreateDefaultSubobject<UInventoryComponent>(TEXT("EquipmentInventory"));
 
+	Equipment = CreateDefaultSubobject<UEquipment>(TEXT("Equipment"));
+	
 	Expenses = CreateDefaultSubobject<UExpensesComponent>(TEXT("Expenses"));
 }
 
@@ -147,7 +160,7 @@ void APlayerCharacter::ChangeSlots()
 		{
 			if (PlayerController->IsInputKeyDown(Mapping.Key))
 			{
-				if (IsValid(Cast<UInputModifierScalar>(Mapping.Modifiers[0])))
+				if (Mapping.Modifiers.IsValidIndex(0) && IsValid(Cast<UInputModifierScalar>(Mapping.Modifiers[0])))
 				{
 					ServerChangeSlot(FMath::TruncToInt(Cast<UInputModifierScalar>(Mapping.Modifiers[0])->Scalar.X));
 					return;
@@ -159,10 +172,11 @@ void APlayerCharacter::ChangeSlots()
 
 void APlayerCharacter::ChangeSlot(const uint8 Slot)
 {
-	if (Inventory->Content.Items.IsValidIndex(Slot - 1))
+	DestroyWeapon();
+	if (Inventory->Content.Items.IsValidIndex(Slot))
 	{
-		const FSerializedInventorySlot Item = Inventory->Content.Items[Slot - 1];
-		CurrentSlot = Slot - 1;
+		const FSerializedInventorySlot Item = Inventory->Content.Items[Slot];
+		CurrentSlot = Slot;
 		CurrentSlotUniqueID = Item.UniqueSlotID;
 		
 		MARK_PROPERTY_DIRTY_FROM_NAME(APlayerCharacter,CurrentSlot,this);
@@ -173,15 +187,11 @@ void APlayerCharacter::ChangeSlot(const uint8 Slot)
 		}
 		ChangeWeapon(Item);
 	}
-	else
-	{
-		DestroyWeapon();
-	}
 }
  
 void APlayerCharacter::ServerChangeSlot_Implementation(const uint8 Slot)
 {
-	ChangeSlot(Slot);
+	ChangeSlot(Slot - 1);
 }
 
 void APlayerCharacter::ChangeWeapon(const FSerializedInventorySlot& Item)
@@ -204,7 +214,6 @@ void APlayerCharacter::ChangeWeapon(const FSerializedInventorySlot& Item)
 void APlayerCharacter::Interact()
 {
 	SR_Interact();
-	GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, "Interacting");
 }
 
 void APlayerCharacter::SR_Interact_Implementation()
@@ -216,7 +225,7 @@ void APlayerCharacter::SR_Interact_Implementation()
 	CollisionShape.SetSphere(10);
 	
 	GetWorld()->SweepMultiByChannel(Hits,Start,End,Camera->GetForwardVector().ToOrientationQuat(),ECC_Visibility,CollisionShape);
-	GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, "Interacting");
+	
 	for (const FHitResult& Hit: Hits)
 	{
 		if (Hit.bBlockingHit && Hit.GetActor() != this)
@@ -224,7 +233,6 @@ void APlayerCharacter::SR_Interact_Implementation()
 			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, Hit.GetActor()->GetName());
 			if (Hit.GetActor()->GetClass()->ImplementsInterface(UIPlayerWorldInteraction::StaticClass()))
 			{
-				GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, "SendingMessage");
 				IIPlayerWorldInteraction::Execute_Interact(Hit.GetActor(),this->GetPlayerState()->GetPlayerController(),Hit);
 				return;	
 			}
@@ -290,16 +298,65 @@ void APlayerCharacter::JumpDelay()
 
 float APlayerCharacter::TakeDamage(float DamageAmount, const FDamageEvent& DamageEvent, AController* EventInstigator,AActor* DamageCauser)
 {
-	if (DamageEvent.DamageTypeClass == UDamageTypeBase::StaticClass())
-	{
-		UDamageTypeBase* DamageType = Cast<UDamageTypeBase>(DamageEvent.DamageTypeClass.GetDefaultObject());
-		SetHealth(Health -= DamageAmount * DamageType->GetDamageMultiplier(PawnType));
-	}
-	else
-	{
-		SetHealth(Health - DamageAmount);
-	}
+	SetHealth(Health - DamageAmount);
+
+	ClientHealthChanged(IsValid(DamageCauser) ? DamageCauser->GetActorLocation() : FVector::ZeroVector);
 	
+	return DamageAmount;
+}
+
+float APlayerCharacter::InternalTakePointDamage(float DamageAmount, FPointDamageEvent const& PointDamageEvent, AController* EventInstigator, AActor* DamageCauser)
+{
+	if (PointDamageEvent.DamageTypeClass == UDamageTypeBase::StaticClass())
+	{
+		EDamageType DamageType = IIDamageTypeInfo::Execute_GetDamageType(PointDamageEvent.DamageTypeClass.GetDefaultObject());
+
+		const TArray<FName> LegsBones = {FName("thigh_l"),FName("thigh_r"),FName("calf_l"),FName("calf_r"),FName("foot_l"),FName("foot_r"),FName("pelvis")};
+	
+		EBodyPart DamagedBodyPart;
+	
+		if (PointDamageEvent.HitInfo.BoneName == "head")
+		{
+			DamagedBodyPart = EBodyPart::Head;
+		}
+		else if  (LegsBones.Contains(PointDamageEvent.HitInfo.BoneName))
+		{
+			DamagedBodyPart = EBodyPart::Legs;
+		}
+		else
+		{
+			DamagedBodyPart = EBodyPart::Body;
+		}
+
+		FEquipmentProtection EquipmentProtection = Equipment->EquipmentProtection.FindRef(DamagedBodyPart);
+		
+		const float Protection = EquipmentProtection.GetTypeProtection(DamageType);
+
+		const float DamageMultiplier = PointDamageEvent.DamageTypeClass->GetDefaultObject<UDamageTypeBase>()->GetDamageMultiplier(EObjectTypes::PawnMedium);
+
+		const float Damage = FMath::GetMappedRangeValueClamped(FVector2D(0,100),FVector2D(0,DamageAmount * DamageMultiplier),Protection);
+		
+		SetHealth(Health - Damage);
+
+		return Damage;
+	}
+	return 0;
+}
+
+void APlayerCharacter::OnComponentLoaded()
+{
+	if (StreamableHandle.IsValid())
+	{
+		CurrentWeapon = AddComponentByClass(Cast<UClass>(StreamableHandle->GetLoadedAsset()),false,FTransform::Identity,false);
+	}
+}
+
+void APlayerCharacter::SetHealth(const float NewHealth)
+{
+	ForceNetUpdate();
+	MARK_PROPERTY_DIRTY_FROM_NAME(ACharacterBase,Health,this);
+	Health = NewHealth;
+
 	if (Health <= 0)
 	{
 		MARK_PROPERTY_DIRTY_FROM_NAME(APlayerCharacter,CharacterState,this);
@@ -314,25 +371,8 @@ float APlayerCharacter::TakeDamage(float DamageAmount, const FDamageEvent& Damag
 			OnKilled();
 		}
 	}
-	
-	ClientHealthChanged(IsValid(DamageCauser) ? DamageCauser->GetActorLocation() : FVector::ZeroVector);
-	return DamageAmount;
-}
 
-void APlayerCharacter::OnComponentLoaded()
-{
-	if (StreamableHandle.IsValid())
-	{
-		GEngine->AddOnScreenDebugMessage(-1,5,FColor::Red,StreamableHandle->GetLoadedAsset()->GetName());
-		CurrentWeapon = AddComponentByClass(Cast<UClass>(StreamableHandle->GetLoadedAsset()),false,FTransform::Identity,false);
-	}
-}
-
-void APlayerCharacter::SetHealth(const float NewHealth)
-{
-	ForceNetUpdate();
-	MARK_PROPERTY_DIRTY_FROM_NAME(ACharacterBase,Health,this);
-	Health = NewHealth;
+	ClientHealthChanged(FVector::ZeroVector);
 }
 
 void APlayerCharacter::IsWeaponChanged(const TArray<int>& ChangedIndexes)
@@ -376,6 +416,7 @@ void APlayerCharacter::OnKilled()
 {
 	GetCharacterMovement()->MaxWalkSpeed = 0;
 	GetCharacterMovement()->SetJumpAllowed(false);
+	OnCharacterStateChanged.Broadcast(CharacterState);
 	Destroy();
 }
 
@@ -398,4 +439,5 @@ void APlayerCharacter::OnBasic() const
 
 	Camera->AttachToComponent(GetCapsuleComponent(),FAttachmentTransformRules::SnapToTargetNotIncludingScale);
 	Camera->SetRelativeLocation(FVector(0,0,65));
+	OnCharacterStateChanged.Broadcast(CharacterState);
 }

@@ -21,7 +21,6 @@ void ACharacterBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 
 	FDoRepLifetimeParams ParamsOwnerOnly;
 	ParamsOwnerOnly.bIsPushBased = true;
-	ParamsOwnerOnly.Condition = COND_OwnerOnly;
 	ParamsOwnerOnly.RepNotifyCondition = REPNOTIFY_OnChanged;
 	DOREPLIFETIME_WITH_PARAMS_FAST(ACharacterBase,Health,ParamsOwnerOnly);
 	
