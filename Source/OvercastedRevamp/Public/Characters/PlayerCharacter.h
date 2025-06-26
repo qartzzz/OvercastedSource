@@ -10,6 +10,7 @@
 #include "Components/Expenses/ExpensesComponent.h"
 #include "Components/Inventory/InventoryComponent.h"
 #include "Engine/StreamableManager.h"
+#include "Interfaces/ICharacterInfo.h"
 #include "PlayerCharacter.generated.h"
 
 UENUM(BlueprintType)
@@ -24,7 +25,7 @@ class UInputMappingContext;
  * 
  */
 UCLASS()
-class OVERCASTEDREVAMP_API APlayerCharacter : public ACharacterBase
+class OVERCASTEDREVAMP_API APlayerCharacter : public ACharacterBase , public IICharacterInfo
 {
 	GENERATED_BODY()
 
@@ -204,7 +205,7 @@ private:
 
 	void OnBasic() const;
 
-	
+	const FEquipmentProtection GetEquipmentProtection_Implementation() override;
 };
 
 

@@ -58,7 +58,19 @@ struct FEquipmentProtection
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float HeatProtection;
 
-	FEquipmentProtection operator+(const FEquipmentProtection& rhs)
+	FORCEINLINE FEquipmentProtection operator+(const FEquipmentProtection& rhs)
+	{
+		const float FP = FirearmProtection + rhs.FirearmProtection;
+		const float MP = MeleeProtection += rhs.MeleeProtection;
+		const float AP = AnimalsProtection += rhs.AnimalsProtection;
+		const float RP = RadiationProtection += rhs.RadiationProtection;
+		const float CP = ColdProtection += rhs.ColdProtection;
+		const float HP = HeatProtection += rhs.HeatProtection;
+		
+		return FEquipmentProtection(FP,MP,AP,RP,CP,HP);
+	}
+
+	FORCEINLINE void operator+= (const FEquipmentProtection& rhs)
 	{
 		FirearmProtection += rhs.FirearmProtection;
 		MeleeProtection += rhs.MeleeProtection;
@@ -66,8 +78,6 @@ struct FEquipmentProtection
 		RadiationProtection += rhs.RadiationProtection;
 		ColdProtection += rhs.ColdProtection;
 		HeatProtection += rhs.HeatProtection;
-		
-		return *this;
 	}
 
 	float GetTypeProtection(const EDamageType DamageType) const

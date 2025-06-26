@@ -23,13 +23,12 @@ void AChoppedTreesManager::GetLifetimeReplicatedProps(TArray<class FLifetimeProp
 	DOREPLIFETIME_WITH_PARAMS_FAST(ThisClass,ChoppedTrees,DoRepLifetimeParams);
 }
 
-void AChoppedTreesManager::AddChoppedTree(FChoppedTree ChoppedTree)
+void AChoppedTreesManager::SpawnTree(FChoppedTree ChoppedTree)
 {
 	FTransform Transform;
 	ChoppedTree.ParentComponent->GetInstanceTransform(ChoppedTree.Index,Transform,true);
 	Transform.SetLocation(Transform.GetLocation()+FVector(0,0,800000));
 	ChoppedTree.ParentComponent->UpdateInstanceTransform(ChoppedTree.Index,Transform,true);
-    ChoppedTree.Chopped = true;
 	
 	ChoppedTrees.ChoppedTrees.Add(ChoppedTree);
 	ChoppedTrees.MarkItemDirty(ChoppedTrees.ChoppedTrees.Last());
@@ -43,31 +42,66 @@ void AChoppedTreesManager::RespawnTree(FChoppedTree ChoppedTree)
 	ChoppedTree.ParentComponent->GetInstanceTransform(ChoppedTree.Index,Transform,true);
 	Transform.SetLocation(Transform.GetLocation()-FVector(0,0,800000));
 	ChoppedTree.ParentComponent->UpdateInstanceTransform(ChoppedTree.Index,Transform,true);
-	ChoppedTree.Chopped = false;
 }
 
 void AChoppedTreesManager::OnRep_ChoppedTrees()
 {
-	for(const FChoppedTree& Tree : ChoppedTrees.ChoppedTrees)
+	for (const FChoppedTree& ChoppedTree : LocalChoppedTrees)
 	{
-		FTransform OutTransform;
-		Tree.ParentComponent->GetInstanceTransform(Tree.Index,OutTransform,true);
-
-		if(Tree.Chopped)
+		const FChoppedTree LocalChoppedTree = ChoppedTree;
+		
+		if (!ChoppedTrees.ChoppedTrees.Contains(ChoppedTree))
 		{
-			if (OutTransform.GetLocation().Z < 300000)
+			FTransform Transform;
+			ChoppedTree.ParentComponent->GetInstanceTransform(ChoppedTree.Index,Transform,true);
+			if (Transform.GetLocation().Z > 500000)
 			{
-				OutTransform.SetLocation(OutTransform.GetLocation()+FVector(0,0,800000));
-				Tree.ParentComponent->UpdateInstanceTransform(Tree.Index,OutTransform,true);
+				Transform.SetLocation(Transform.GetLocation()-FVector(0,0,800000));
+				ChoppedTree.ParentComponent->UpdateInstanceTransform(ChoppedTree.Index,Transform,true);
 			}
 		}
 		else
 		{
-			if (OutTransform.GetLocation().Z > 300000)
+			FTransform OutTransform;
+			ChoppedTree.ParentComponent->GetInstanceTransform(ChoppedTree.Index,OutTransform,true);
+
+			if (OutTransform.GetLocation().Z < 300000)
 			{
-				OutTransform.SetLocation(OutTransform.GetLocation()-FVector(0,0,800000));
-				Tree.ParentComponent->UpdateInstanceTransform(Tree.Index,OutTransform,true);
+				OutTransform.SetLocation(OutTransform.GetLocation()+FVector(0,0,800000));
+				ChoppedTree.ParentComponent->UpdateInstanceTransform(ChoppedTree.Index,OutTransform,true);
 			}
 		}
+	}
+	
+	LocalChoppedTrees = ChoppedTrees.ChoppedTrees;
+}
+
+void AChoppedTreesManager::BeginPlay()
+{
+	Super::BeginPlay();
+	
+	if (HasAuthority())
+	{
+		FTimerHandle RespawnTimerHandle;
+		GetWorldTimerManager().SetTimer(RespawnTimerHandle,this,&ThisClass::RespawnTrees,RespawnRate,true,FMath::RandRange(RespawnRate * -0.97,1.0));
+	}
+}
+
+void AChoppedTreesManager::RespawnTrees()
+{
+	bool Respawned = false;
+	
+	for (const FChoppedTree& Tree : ChoppedTrees.ChoppedTrees)
+	{
+		if (FMath::RandRange(0,100) > 66)
+		{
+			Respawned = true;
+			RespawnTree(Tree);
+		}
+	}
+
+	if (Respawned)
+	{
+		ChoppedTrees.MarkArrayDirty();
 	}
 }

@@ -3,6 +3,7 @@
 #include "Characters/Components/Expenses/ExpensesComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "Characters/Components/Expenses/ExpenseAffects/ExpenseAffectBase.h"
+#include "Characters/Interfaces/ICharacterInfo.h"
 
 void FExpense::PreReplicatedRemove(const FExpensesArray& InArraySerializer)
 {
@@ -68,7 +69,7 @@ void UExpensesComponent::AddExpense(EExpenses Expense, float Value)
 	{
 		if (Element.Expense == Expense)
 		{
-			Element.Value = FMath::Clamp(Value + Element.Value,0,ExpensesSettings[Expense].MaxAmount);
+			Element.Value = FMath::Clamp(Value - GetOwnerProtection(Expense) + Element.Value,0,ExpensesSettings[Expense].MaxAmount);
 			ExpensesArray.MarkItemDirty(Element);
 			GetOwner()->ForceNetUpdate();
 		}
@@ -102,4 +103,24 @@ void UExpensesComponent::GetLifetimeReplicatedProps(TArray<class FLifetimeProper
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME_CONDITION(ThisClass,ExpensesArray,COND_OwnerOnly);
+}
+
+float UExpensesComponent::GetOwnerProtection(EExpenses Expense)
+{
+	const FEquipmentProtection Protection = IICharacterInfo::Execute_GetEquipmentProtection(GetOwner());
+
+	switch (Expense) {
+	case EExpenses::Food:
+		break;
+	case EExpenses::Water:
+		break;
+	case EExpenses::Radiation:
+		return Protection.RadiationProtection;
+		break;
+	case EExpenses::Poison:
+		break;
+	case EExpenses::Bleeding:
+		break;
+	}
+    return 0;
 }

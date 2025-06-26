@@ -56,7 +56,6 @@ void AProjectile::BeginPlay()
 				DamageEvent.DamageTypeClass = DamageType;
 				
 				Hit.GetActor()->TakeDamage(DamageAmount,DamageEvent,Controller,GetOwner());
-				GEngine->AddOnScreenDebugMessage(-1,5,FColor::Red,"Hit");
 			} 
 			Destroy();
 		}
@@ -76,10 +75,10 @@ void AProjectile::BeginPlay()
 		if (Hit.bBlockingHit && !WasHit)
 		{
 			WasHit = true;
-			GEngine->AddOnScreenDebugMessage(-1,5,FColor::Red,"ClientHit");
+		
 			if (DT_Impacts->GetRowNames().Contains(Hit.PhysMaterial->GetName()))
 			{ 
-				GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, Hit.PhysMaterial->GetName());
+				//GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, Hit.PhysMaterial->GetName());
 				const FProjectileImpacts* ImpactFX = DT_Impacts->FindRow<FProjectileImpacts>(FName(Hit.PhysMaterial.Get()->GetFName()),"");
 				
 				constexpr EAttachLocation::Type LocationType = EAttachLocation::KeepWorldPosition;
@@ -153,7 +152,6 @@ void AProjectile::ProjectileTick(float DeltaTime)
 			
 			if (DT_Impacts->GetRowNames().Contains(Hit.PhysMaterial->GetName()))
 			{ 
-				GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, Hit.PhysMaterial->GetName());
 				const FProjectileImpacts* ImpactFX = DT_Impacts->FindRow<FProjectileImpacts>(FName(Hit.PhysMaterial.Get()->GetFName()),"");
 				
 				constexpr EAttachLocation::Type LocationType = EAttachLocation::KeepWorldPosition;

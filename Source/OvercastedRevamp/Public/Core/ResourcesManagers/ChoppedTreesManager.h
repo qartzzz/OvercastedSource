@@ -14,16 +14,14 @@ struct FChoppedTree : public FFastArraySerializerItem
 	UPROPERTY(BlueprintReadWrite)
 	int Index;
 	UPROPERTY(BlueprintReadWrite)
-	bool Chopped;
-	UPROPERTY(BlueprintReadWrite)
 	UHierarchicalInstancedStaticMeshComponent* ParentComponent;
 
-	bool operator==(const FChoppedTree& Other) const
+	FORCEINLINE bool operator==(const FChoppedTree& Other) const
 	{
-		return Index == Other.Index && Chopped == Other.Chopped && ParentComponent == Other.ParentComponent;
+		return Index == Other.Index && ParentComponent == Other.ParentComponent;
 	}
 	
-	FChoppedTree(const int InIndex = -1,const bool InChopped = false, UHierarchicalInstancedStaticMeshComponent* InParentComponent = nullptr) : Index(InIndex),Chopped(InChopped), ParentComponent(InParentComponent) {}
+	FChoppedTree(const int InIndex = -1,const bool InChopped = false, UHierarchicalInstancedStaticMeshComponent* InParentComponent = nullptr) : Index(InIndex), ParentComponent(InParentComponent) {}
 };
 
 USTRUCT(BlueprintType)
@@ -57,11 +55,15 @@ public:
 	AChoppedTreesManager();
 
 	UFUNCTION(BlueprintCallable,BlueprintAuthorityOnly,Category="ChoppedTreesManager")
-    void AddChoppedTree(FChoppedTree ChoppedTree);
+    void SpawnTree(FChoppedTree ChoppedTree);
 
 	void RespawnTree(FChoppedTree ChoppedTree);
 	
 	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
+
+	float RespawnRate;
+protected:
+	virtual void BeginPlay() override;
 
 private:
 	UPROPERTY(ReplicatedUsing="OnRep_ChoppedTrees")
@@ -69,4 +71,11 @@ private:
 
 	UFUNCTION()
 	void OnRep_ChoppedTrees();
+
+	TArray<FChoppedTree> LocalChoppedTrees;
+
+	FTimerHandle RespawnTreesTimer;
+	
+    UFUNCTION()
+	void RespawnTrees();
 };

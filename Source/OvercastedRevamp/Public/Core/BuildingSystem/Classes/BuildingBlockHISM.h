@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
+#include "Core/BuildingSystem/Structures/BuildingSystemStructures.h"
 #include "BuildingBlockHISM.generated.h"
 
 /**
@@ -15,4 +16,13 @@ class OVERCASTEDREVAMP_API UBuildingBlockHISM : public UHierarchicalInstancedSta
 	GENERATED_BODY()
 public:
 	UBuildingBlockHISM();
+
+	UFUNCTION()
+	bool RemoveInstanceByData(const FVector& BlockLocation,const EBlockRotation& BlockRotation);
+
+	void AddInstanceByData(const FVector& BlockLocation,const EBlockRotation& BlockRotation);
+
+	static int TransformFind(const TArray<FTransform>&, const FTransform& Transform);
 };
+
+ 

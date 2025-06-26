@@ -16,6 +16,7 @@
 #include "GameFramework/PlayerState.h"
 #include "Interfaces/IPlayerWorldInteraction.h"
 #include "Interfaces/IWeaponInteraction.h"
+#include "Kismet/KismetSystemLibrary.h"
 
 
 APlayerCharacter::APlayerCharacter()
@@ -218,27 +219,22 @@ void APlayerCharacter::Interact()
 
 void APlayerCharacter::SR_Interact_Implementation()
 {
-	TArray<FHitResult> Hits;
+	FHitResult Hit;
 	const FVector Start = Camera->GetComponentLocation();
 	const FVector End = Start + GetBaseAimRotation().Vector() * 400;
-	FCollisionShape CollisionShape;
-	CollisionShape.SetSphere(10);
+	TArray<AActor*> IgnoreActors;
+	IgnoreActors.Add(this);
 	
-	GetWorld()->SweepMultiByChannel(Hits,Start,End,Camera->GetForwardVector().ToOrientationQuat(),ECC_Visibility,CollisionShape);
+	UKismetSystemLibrary::SphereTraceSingle(GetWorld(),Start,End,4,TraceTypeQuery1,false,IgnoreActors,EDrawDebugTrace::None,Hit,true);
 	
-	for (const FHitResult& Hit: Hits)
+	if (Hit.bBlockingHit && Hit.GetActor() != this)
 	{
-		if (Hit.bBlockingHit && Hit.GetActor() != this)
+		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, Hit.GetActor()->GetName());
+		if (Hit.GetActor()->GetClass()->ImplementsInterface(UIPlayerWorldInteraction::StaticClass()))
 		{
-			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, Hit.GetActor()->GetName());
-			if (Hit.GetActor()->GetClass()->ImplementsInterface(UIPlayerWorldInteraction::StaticClass()))
-			{
-				IIPlayerWorldInteraction::Execute_Interact(Hit.GetActor(),this->GetPlayerState()->GetPlayerController(),Hit);
-				return;	
-			}
+			IIPlayerWorldInteraction::Execute_Interact(Hit.GetActor(),this->GetPlayerState()->GetPlayerController(),Hit);
 		}
 	}
-	
 }
 
 void APlayerCharacter::Attack()
@@ -328,7 +324,7 @@ float APlayerCharacter::InternalTakePointDamage(float DamageAmount, FPointDamage
 			DamagedBodyPart = EBodyPart::Body;
 		}
 
-		FEquipmentProtection EquipmentProtection = Equipment->EquipmentProtection.FindRef(DamagedBodyPart);
+		FEquipmentProtection EquipmentProtection = Equipment->PartialProtection.FindRef(DamagedBodyPart);
 		
 		const float Protection = EquipmentProtection.GetTypeProtection(DamageType);
 
@@ -440,4 +436,9 @@ void APlayerCharacter::OnBasic() const
 	Camera->AttachToComponent(GetCapsuleComponent(),FAttachmentTransformRules::SnapToTargetNotIncludingScale);
 	Camera->SetRelativeLocation(FVector(0,0,65));
 	OnCharacterStateChanged.Broadcast(CharacterState);
+}
+
+const FEquipmentProtection APlayerCharacter::GetEquipmentProtection_Implementation()
+{
+	return Equipment->Protection;
 }

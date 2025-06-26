@@ -27,15 +27,13 @@ enum class EBlockType : uint8
 UENUM(BlueprintType)
 enum class EBlockMesh : uint8
 {
-	PendingDestroy,
+	None,
 	WoodenWall,
 	WoodenDoorway,
 	WoodenWindow,
 	WoodenLowWall,
 	WoodenFloor,
-	WoodenFoundation
-
-	
+	WoodenFoundation,
 };
 
 UENUM(BlueprintType)
@@ -51,10 +49,7 @@ struct FBuildingBlockParams : public FTableRowBase
 	GENERATED_BODY()
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TSoftObjectPtr<UStaticMesh> StaticMesh;
-	
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	int MaxHP;
 	
-	FBuildingBlockParams() : StaticMesh(nullptr), MaxHP(0) {}
+	FBuildingBlockParams() : MaxHP(0) {}
 };

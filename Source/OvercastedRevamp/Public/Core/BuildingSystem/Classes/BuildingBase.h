@@ -16,14 +16,14 @@ struct FFastBlockLocation : public FFastArraySerializerItem
 
 	UPROPERTY()
 	FVector BlockLocation;
-
+	 
     FORCEINLINE bool operator== (const FFastBlockLocation& Other) const
 	{
       return BlockLocation == Other.BlockLocation;
 	}
 
 	
-	FFastBlockLocation(FVector BlockLocation = FVector::ZeroVector) : BlockLocation(BlockLocation) {}
+	FFastBlockLocation(const FVector& BlockLocation = FVector::ZeroVector) : BlockLocation(BlockLocation) {}
 };
 
 USTRUCT(BlueprintType)
@@ -50,7 +50,7 @@ struct FFastBlockRotation : public FFastArraySerializerItem
 	UPROPERTY()
 	EBlockRotation BlockRotation;
 
-	FFastBlockRotation() : BlockRotation(EBlockRotation::Zero) {}
+	FFastBlockRotation(const EBlockRotation BlockRotation = EBlockRotation::Zero) : BlockRotation(BlockRotation) {}
 };
 
 USTRUCT(BlueprintType)
@@ -103,8 +103,8 @@ struct FFastBlockMesh : public FFastArraySerializerItem
 
 	UPROPERTY()
 	EBlockMesh BlockMesh;
-
-	FFastBlockMesh(const EBlockMesh InMesh = EBlockMesh::PendingDestroy) : BlockMesh(InMesh) {}
+	
+	FFastBlockMesh(const EBlockMesh InMesh = EBlockMesh::WoodenWall) : BlockMesh(InMesh) {}
 };
 
 USTRUCT(BlueprintType)
@@ -120,7 +120,7 @@ struct FFastBlocksMeshes : public FFastArraySerializer
 		return FastArrayDeltaSerialize<FFastBlockMesh,FFastBlocksMeshes>(BlocksMeshes, DeltaParams,*this);
 	}
 	
-	FFastBlocksMeshes(TArray<EBlockMesh> InBlocksMeshes = {}) : BlocksMeshes(InBlocksMeshes) {}
+	FFastBlocksMeshes(const TArray<EBlockMesh>& InBlocksMeshes = {}) : BlocksMeshes(InBlocksMeshes) {}
 };
 
 USTRUCT(BlueprintType)
@@ -202,17 +202,6 @@ struct FBuildingLayer
 	FBuildingLayer(float Height = 0,EBlockType BlockType = EBlockType::Wall) : Height(Height), BlockType(BlockType) {}
 };
 
-USTRUCT(BlueprintType)
-struct FIntArray
-{
-	GENERATED_BODY()
-	UPROPERTY()
-	//First int is index in locations array second int is index in HISM
-	TArray<int> ArrayIndexes;
-    TArray<int> InstanceIndexes;
-	FIntArray() : ArrayIndexes({}), InstanceIndexes( {}) {}
-};
-
 UCLASS()
 class OVERCASTEDREVAMP_API ABuildingBase : public AActor
 {
@@ -223,10 +212,17 @@ public:
 	ABuildingBase();
 
 	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
+	
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "BuildingBase | Blocks")
+	void AddBlock(const FVector RelativeLocation,const EBlockRotation RelativeRotation,const EBlockType BlockType,const EBlockMesh BlockMesh);
+
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "BuildingBase | Blocks")
+	void RemoveBlock(const FVector RelativeLocation,const EBlockRotation RelativeRotation,const EBlockMesh BlockMesh);
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
+private:
 	UPROPERTY(Replicated,VisibleAnywhere)
 	FFastBlocksLocations BlocksLocations;
 	
@@ -248,15 +244,50 @@ protected:
 	UPROPERTY(Replicated,VisibleAnywhere)
 	FFastFloats BlocksHealth;
 
-private:
+	UPROPERTY(EditDefaultsOnly)
+	USceneComponent* Root;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "BuildingBase | BlockMeshes", meta = (AllowPrivateAccess = "true"))
+	UBuildingBlockHISM* WoodenWall;
+
+	UPROPERTY(EditDefaultsOnly, Category = "BuildingBase | BlockMeshes", meta = (AllowPrivateAccess = "true"))
+	UBuildingBlockHISM* WoodenLowWall;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "BuildingBase | BlockMeshes", meta = (AllowPrivateAccess = "true"))
+	UBuildingBlockHISM* WoodenDoorway;
+
+	UPROPERTY(EditDefaultsOnly, Category = "BuildingBase | BlockMeshes", meta = (AllowPrivateAccess = "true"))
+	UBuildingBlockHISM* WoodenWindow;
+
+	UPROPERTY(EditDefaultsOnly, Category = "BuildingBase | BlockMeshes", meta = (AllowPrivateAccess = "true"))
+	UBuildingBlockHISM* WoodenFloor;
+
+	UPROPERTY(EditDefaultsOnly, Category = "BuildingBase | BlockMeshes", meta = (AllowPrivateAccess = "true"))
+	UBuildingBlockHISM* WoodenFoundation;
+
+	UPROPERTY(EditDefaultsOnly, Category = "BuildingBase | BlockMeshes", meta = (AllowPrivateAccess = "true"))
+	UBuildingBlockHISM* DestroyedBlocks;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "HISM")
+	TMap<EBlockMesh,UBuildingBlockHISM*> HISMComponents;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "DataTable")
+	UDataTable* DT_BuildingBlocks;
+
+	TArray<FFastBlockMesh> LocalBlockMeshes;
+
+	TArray<FFastBlockLocation> LocalBlockLocations;
+
+	TArray<FFastBlockRotation> LocalBlockRotations;
+	
 	UFUNCTION()
 	void OnRep_BlocksMeshes();
-
-	void SortLayers(TMap<FBuildingLayer,FInts>& MapToSort);
 	
 	UFUNCTION(CallInEditor)
 	void CalculateStability();
-
+	
+	void SortLayers(TMap<FBuildingLayer,FInts>& MapToSort);
+	
 	void CalculateWallStability(const int& Index);
 
 	void CalculateFloorStability(const int& Index);
@@ -268,22 +299,8 @@ private:
 	uint8 GetStableUnder(const int& Index);
 
 	uint8 GetFloorSideStable(const FVector& BlockLocation,const uint8& Side);
-
+	
 	void ClearArraysGarbage();
-	
-    UFUNCTION(BlueprintCallable, Category = "BuildingBase | Blocks")
-	void AddBlock(const FVector& RelativeLocation,const EBlockRotation& RelativeRotation,const EBlockType& BlockType,const EBlockMesh& BlockMesh);
-	
-	UPROPERTY(EditDefaultsOnly, Category = "HISM")
-	TMap<EBlockMesh,UBuildingBlockHISM*> HISMComponents;
-	
-	UPROPERTY(EditDefaultsOnly, Category = "Maps")
-	TMap<EBlockMesh,FIntArray> MeshesMap;
-	
-	UPROPERTY(EditDefaultsOnly, Category = "DataTable")
-	UDataTable* DT_BuildingBlocks;
-
-	
 };
 
 

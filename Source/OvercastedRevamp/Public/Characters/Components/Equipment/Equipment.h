@@ -25,8 +25,11 @@ protected:
 
 public:
 	UPROPERTY(BlueprintReadOnly)
-	TMap<EBodyPart,FEquipmentProtection> EquipmentProtection;
+	TMap<EBodyPart,FEquipmentProtection> PartialProtection;
 
+	UPROPERTY(BlueprintReadOnly)
+	FEquipmentProtection Protection;
+	
 	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
 private:
 	UPROPERTY(ReplicatedUsing=OnRep_Equipment)
@@ -44,11 +47,14 @@ private:
 	UFUNCTION()
 	void OnRep_Equipment();
 	UFUNCTION()
-	void OnEquipmentLoaded();
+	void OnEquipmentLoaded() const;
 
 	UFUNCTION()
-	void OnFPSEquipmentLoaded();
+	void OnFPSEquipmentLoaded() const;
 	
 	UFUNCTION()
 	void UpdateEquipment(const TArray<int>& Indices);
+
+	UFUNCTION()
+	void CalculateProtection();
 };

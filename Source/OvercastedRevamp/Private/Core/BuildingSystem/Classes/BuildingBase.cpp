@@ -14,7 +14,25 @@ ABuildingBase::ABuildingBase()
 	SetNetDormancy(DORM_Initial);
 	SetNetUpdateFrequency(0.1);
 
-	SetRootComponent(CreateDefaultSubobject<USceneComponent>("Root"));
+	Root = CreateDefaultSubobject<USceneComponent>("Root");
+	SetRootComponent(Root);
+
+	WoodenWall = CreateDefaultSubobject<UBuildingBlockHISM>("WoodenWall");
+	WoodenWall->SetupAttachment(Root);
+	WoodenLowWall = CreateDefaultSubobject<UBuildingBlockHISM>("WoodenLowWall");
+	WoodenLowWall->SetupAttachment(Root);
+	WoodenDoorway = CreateDefaultSubobject<UBuildingBlockHISM>("WoodenDoorway");
+	WoodenDoorway->SetupAttachment(Root);
+	WoodenWindow = CreateDefaultSubobject<UBuildingBlockHISM>("WoodenWindow");
+	WoodenWindow->SetupAttachment(Root);
+	WoodenFloor = CreateDefaultSubobject<UBuildingBlockHISM>("WoodenFloor");
+	WoodenFloor->SetupAttachment(Root);
+	WoodenFoundation = CreateDefaultSubobject<UBuildingBlockHISM>("WoodenFoundation");
+	WoodenFoundation->SetupAttachment(Root);
+	DestroyedBlocks = CreateDefaultSubobject<UBuildingBlockHISM>("DestroyedBlocks");
+	DestroyedBlocks->SetupAttachment(Root);
+
+	DT_BuildingBlocks = ConstructorHelpers::FObjectFinder<UDataTable>(TEXT("/Game/Core/BuildingSystem/StructureBasedBuildingSystem/DataTable/DT_BuildingBlocks.DT_BuildingBlocks")).Object;
 }
 
 void ABuildingBase::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const
@@ -28,8 +46,12 @@ void ABuildingBase::GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& 
 	DOREPLIFETIME(ThisClass,BlocksTypes);
 
 	DOREPLIFETIME(ThisClass,BlocksLevels);
+
+	DOREPLIFETIME(ThisClass,BlocksStable);
 	
 	DOREPLIFETIME(ThisClass,BlocksMeshes);
+
+	DOREPLIFETIME(ThisClass,BlocksHealth);
 }
 
 // Called when the game starts or when spawned
@@ -41,42 +63,49 @@ void ABuildingBase::BeginPlay()
 		FTimerHandle ClearGarbageHandle;
 		GetWorldTimerManager().SetTimer(ClearGarbageHandle,this,&ThisClass::ClearArraysGarbage,600,true);
 	}
+
+	HISMComponents.Add(EBlockMesh::WoodenWall,WoodenWall);
+	HISMComponents.Add(EBlockMesh::WoodenLowWall,WoodenLowWall);
+	HISMComponents.Add(EBlockMesh::WoodenWindow,WoodenWindow);
+	HISMComponents.Add(EBlockMesh::WoodenDoorway,WoodenDoorway);
+	HISMComponents.Add(EBlockMesh::WoodenFloor,WoodenFloor);
+	HISMComponents.Add(EBlockMesh::WoodenFoundation,WoodenFoundation);
+	HISMComponents.Add(EBlockMesh::None,DestroyedBlocks);
 }
 
 void ABuildingBase::OnRep_BlocksMeshes()
 {
-	TArray<int> IndexesToRemove;
-	for (int i = 0;i != BlocksMeshes.BlocksMeshes.Num(); i++)
+	for (int i = 0; i != BlocksLocations.BlocksLocations.Num(); i++)
 	{
-		const EBlockMesh& BlockMesh = BlocksMeshes.BlocksMeshes[i].BlockMesh;
-		if (BlockMesh == EBlockMesh::PendingDestroy)
+		const int LocalIndex = LocalBlockLocations.Find(BlocksLocations.BlocksLocations[i]);
+		
+		if (LocalIndex == INDEX_NONE)
 		{
-			IndexesToRemove.Add(i);
+			HISMComponents.FindRef(BlocksMeshes.BlocksMeshes[i].BlockMesh)->AddInstanceByData(BlocksLocations.BlocksLocations[i].BlockLocation,BlocksRotations.BlocksRotations[i].BlockRotation);
 		}
-	}
-	
-	for (const TPair<EBlockMesh,FIntArray>& Pair : MeshesMap)
-	{
-		for (const int& Index : Pair.Value.InstanceIndexes)
+		else
 		{
-			HISMComponents.FindRef(Pair.Key)->RemoveInstance(Index);
+			if (LocalBlockMeshes[LocalIndex].BlockMesh != BlocksMeshes.BlocksMeshes[i].BlockMesh)
+			{
+				HISMComponents.FindRef(BlocksMeshes.BlocksMeshes[i].BlockMesh)->AddInstanceByData(BlocksLocations.BlocksLocations[i].BlockLocation,BlocksRotations.BlocksRotations[i].BlockRotation);
+				HISMComponents.FindRef(LocalBlockMeshes[LocalIndex].BlockMesh)->RemoveInstanceByData(LocalBlockLocations[LocalIndex].BlockLocation,LocalBlockRotations[LocalIndex].BlockRotation);
+			}
 		}
 	}
 
-	for (int i = 0; i != BlocksMeshes.BlocksMeshes.Num(); i++)
+	for (int i = 0; i != LocalBlockLocations.Num(); i++)
 	{
-		const EBlockMesh& Mesh = BlocksMeshes.BlocksMeshes[i].BlockMesh;
-		
-        if (!MeshesMap.FindRef(Mesh).ArrayIndexes.Contains(i))
-        {
-           UBuildingBlockHISM* HISM = HISMComponents.FindRef(Mesh);
-	       MeshesMap.FindRef(Mesh).ArrayIndexes.Add(i);
-           FTransform Transform = FTransform();
-           Transform.SetLocation(BlocksLocations.BlocksLocations[i].BlockLocation);
-           Transform.SetRotation(FQuat(0,0,BlocksRotations.BlocksRotations[i].BlockRotation == EBlockRotation::Zero ? 0 : 90,0 ));
-           MeshesMap.FindRef(Mesh).InstanceIndexes.Add(HISM->AddInstance(Transform));
-        }
+		if (!BlocksLocations.BlocksLocations.Contains(LocalBlockLocations[i]))
+		{
+			HISMComponents.FindRef(LocalBlockMeshes[i].BlockMesh)->RemoveInstanceByData(LocalBlockLocations[i].BlockLocation,LocalBlockRotations[i].BlockRotation);
+		}
 	}
+	
+	LocalBlockMeshes = BlocksMeshes.BlocksMeshes;
+
+	LocalBlockLocations = BlocksLocations.BlocksLocations;
+
+	LocalBlockRotations = BlocksRotations.BlocksRotations;
 } 
 
 void ABuildingBase::SortLayers(TMap<FBuildingLayer, FInts>& MapToSort)
@@ -198,39 +227,25 @@ uint8 ABuildingBase::GetFloorSideStable(const FVector& BlockLocation, const uint
 
 void ABuildingBase::ClearArraysGarbage()
 {
+	BlocksLocations.MarkArrayDirty();
+	BlocksRotations.MarkArrayDirty();
+	BlocksTypes.MarkArrayDirty();
+	BlocksMeshes.MarkArrayDirty();
+	BlocksLevels.MarkArrayDirty();
+	BlocksStable.MarkArrayDirty();
+	BlocksHealth.MarkArrayDirty();
+	
 	TArray<int> IndexesToRemove;
-	for (int i = 0;i != BlocksMeshes.BlocksMeshes.Num(); i++)
+	for (int i = 0;i != BlocksLocations.BlocksLocations.Num(); i++)
 	{
-		const EBlockMesh& BlockMesh = BlocksMeshes.BlocksMeshes[i].BlockMesh;
-		if (BlockMesh == EBlockMesh::PendingDestroy)
+		if (BlocksLocations.BlocksLocations[i].BlockLocation.Z > 1000000)
 		{
 			IndexesToRemove.Add(i);
 		}
 	}
-
+ 
 	for (const int& Index : IndexesToRemove)
 	{
-		for (TPair<EBlockMesh,FIntArray>& Pair : MeshesMap.Array())
-		{
-			if (Pair.Value.ArrayIndexes.Contains(Index))
-			{
-				const int RemoveIndex = Pair.Value.ArrayIndexes.Find(Index);
-				Pair.Value.ArrayIndexes.RemoveAt(RemoveIndex);
-				Pair.Value.InstanceIndexes.RemoveAt(RemoveIndex);
-			}
-		}
-	}
-
-	for (const int& Index : IndexesToRemove)
-	{
-		BlocksLocations.MarkArrayDirty();
-		BlocksRotations.MarkArrayDirty();
-		BlocksTypes.MarkArrayDirty();
-		BlocksMeshes.MarkArrayDirty();
-		BlocksLevels.MarkArrayDirty();
-		BlocksStable.MarkArrayDirty();
-		BlocksHealth.MarkArrayDirty();
-		
 		BlocksLocations.BlocksLocations.RemoveAt(Index);
 		BlocksRotations.BlocksRotations.RemoveAt(Index);
 		BlocksTypes.BlocksTypes.RemoveAt(Index);
@@ -350,15 +365,39 @@ uint8 ABuildingBase::GetStableUnder(const int& Index)
 	return HighestStable;
 }
 
-void ABuildingBase::AddBlock(const FVector& RelativeLocation, const EBlockRotation& RelativeRotation,
-	const EBlockType& BlockType, const EBlockMesh& BlockMesh)
+void ABuildingBase::AddBlock(const FVector RelativeLocation, const EBlockRotation RelativeRotation,
+	const EBlockType BlockType, const EBlockMesh BlockMesh)
 {
 	ForceNetUpdate();
-	
-	const int& Index = BlocksMeshes.BlocksMeshes.Add(FFastBlockMesh(BlockMesh));
-	BlocksMeshes.MarkItemDirty(BlocksMeshes.BlocksMeshes[Index]);
+	BlocksLocations.BlocksLocations.Add(RelativeLocation);
+	BlocksLocations.MarkItemDirty(BlocksLocations.BlocksLocations.Last());
 
-	BlocksHealth.Floats.Add(FFastFloat(DT_BuildingBlocks->FindRow<FBuildingBlockParams>(FName(UEnum::GetDisplayValueAsText(BlockMesh).ToString()),"")->MaxHP));
+	BlocksRotations.BlocksRotations.Add(RelativeRotation);
+	BlocksRotations.MarkItemDirty(BlocksRotations.BlocksRotations.Last());
+	
+	BlocksMeshes.BlocksMeshes.Add(FFastBlockMesh(BlockMesh));
+	BlocksMeshes.MarkItemDirty(BlocksMeshes.BlocksMeshes.Last());
+	
+	BlocksHealth.Floats.Add(FFastFloat(DT_BuildingBlocks->FindRow<FBuildingBlockParams>(FName(UEnum::GetValueAsString(BlockMesh).RightChop(12)),"")->MaxHP));
+	BlocksHealth.MarkItemDirty(BlocksHealth.Floats.Last());
+
+	HISMComponents.FindRef(BlockMesh)->AddInstanceByData(RelativeLocation, RelativeRotation);
+}
+
+void ABuildingBase::RemoveBlock(const FVector RelativeLocation, const EBlockRotation RelativeRotation, const EBlockMesh BlockMesh)
+{
+	ForceNetUpdate();
+	const int IndexToRemove = BlocksLocations.BlocksLocations.Find(RelativeLocation);
+
+	if (IndexToRemove != INDEX_NONE)
+	{
+		BlocksLocations.BlocksLocations[IndexToRemove].BlockLocation += FVector(0,0,1000000);
+		BlocksLocations.MarkItemDirty(BlocksLocations.BlocksLocations[IndexToRemove]);
+		
+		BlocksMeshes.BlocksMeshes[IndexToRemove].BlockMesh = EBlockMesh::None;
+		BlocksMeshes.MarkItemDirty(BlocksMeshes.BlocksMeshes[IndexToRemove]);
+		HISMComponents.FindRef(BlockMesh)->RemoveInstanceByData(RelativeLocation,RelativeRotation);
+	}
 }
 
 
